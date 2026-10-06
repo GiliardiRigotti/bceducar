@@ -1,0 +1,13 @@
+services:
+  pmd-build:
+    image: node:22-alpine
+    profiles: [tools]
+    working_dir: /var/www/pre-matricula-digital
+    volumes:
+      - ./packages/portabilis/pre-matricula-digital:/var/www/pre-matricula-digital
+      - pmd-node-modules:/var/www/pre-matricula-digital/node_modules
+      - ./public/vendor/maps:/var/www/maps
+    command: sh -c "yarn install --frozen-lockfile --non-interactive && yarn build --base=/vendor/pre-matricula-digital/ && cp -r node_modules/leaflet/dist/. /var/www/maps/"
+
+volumes:
+  pmd-node-modules:

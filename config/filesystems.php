@@ -30,6 +30,13 @@ return [
 
     'disks' => [
 
+        'registration-documents' => [
+            'driver' => 'local',
+            'root' => storage_path('app'),
+            'visibility' => 'private',
+            'throw' => true,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

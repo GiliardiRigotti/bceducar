@@ -1,0 +1,23 @@
+import {it, expect, vi} from 'vitest';
+import {mount} from '@vue/test-utils';
+import L from 'leaflet';
+import GeoMarker from '@/components/maps/GeoMarker.vue';
+it('shows blue school pins with safe permanent names and leaves the address fixed', () => {
+  const instance = {addTo:vi.fn().mockReturnThis(),on:vi.fn(),bindTooltip:vi.fn(),bindPopup:vi.fn(),setLatLng:vi.fn(),remove:vi.fn()};
+  (L.marker as any).mockReturnValue(instance);
+  const map = {on:vi.fn(),off:vi.fn()};
+  const position = {lat:-26.99,lng:-48.63};
+  const wrapper = mount(GeoMarker,{props:{map:map as any,marker:{id:1,title:'School',position,color:'blue',permanentLabel:'School <test>'}}});
+  expect((L.divIcon as any).mock.calls.at(-1)[0].html).toContain('#1769d2');
+  const label = instance.bindTooltip.mock.calls[0][0];
+  expect(label.textContent).toBe('School <test>');
+  expect(label.children).toHaveLength(0);
+  expect(label.childNodes[0].nodeType).toBe(3);
+  expect(instance.bindTooltip.mock.calls[0][1].permanent).toBe(true);
+  const click = map.on.mock.calls.find(call=>call[0]==='click')![1];
+  click({latlng:{lat:1,lng:2}});
+  expect(instance.setLatLng).not.toHaveBeenCalled();
+  expect(wrapper.emitted('new-position')).toBeUndefined();
+  expect(position).toEqual({lat:-26.99,lng:-48.63});
+  wrapper.unmount();
+});

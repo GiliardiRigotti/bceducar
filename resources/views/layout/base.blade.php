@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="shortcut icon" href="{{ url('favicon.ico') }}" />
+    <link rel="shortcut icon" href="{{ url('favicon.ico') }}?v=bc-20261005" />
     <title>@if(isset($title)) {!! html_entity_decode($title) !!} - @endif {{ html_entity_decode(config('legacy.app.entity.name')) }} - i-Educar</title>
 
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans">
@@ -18,7 +18,7 @@
 <div class="ieducar-container">
     <header class="ieducar-header">
         <div class="ieducar-header-logo">
-            <h1><a href="{{ Asset::get('/') }}">i-Educar</a></h1>
+            <h1><a href="{{ Asset::get('/') }}"><img src="{{ asset('img/brasao-balneario-camboriu.png') }}" alt="Brasão de Balneário Camboriú" style="width:36px;height:40px;object-fit:contain;vertical-align:middle;margin-right:10px">i-Educar</a></h1>
         </div>
         <div class="ieducar-header-links">
             <div class="dropdown">

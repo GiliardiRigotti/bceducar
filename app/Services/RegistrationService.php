@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\EnrollmentRequests\NativePhysicalGuard;
 use App\Exceptions\Registration\RegistrationException;
 use App\Models\LegacyEnrollment;
 use App\Models\LegacyGradeSequence;
@@ -86,6 +87,9 @@ class RegistrationService
     public function updateStatus(LegacyRegistration $registration, $data)
     {
         $status = $data['nova_situacao'];
+        if (in_array((int) $status, [1, 2, 3], true)) {
+            app(NativePhysicalGuard::class)->assertConfirmed($registration);
+        }
 
         $registration->aprovado = $status;
         $registration->save();

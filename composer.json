@@ -44,6 +44,8 @@
         "maatwebsite/excel": "^4.0",
         "phpoffice/phpspreadsheet": "^5.8",
         "predis/predis": "^2.3",
+        "portabilis/i-educar-transport-package": "@dev",
+        "portabilis/pre-matricula-digital": "@dev",
         "psr/simple-cache": "^3.0",
         "socialiteproviders/laravelpassport": "^4.3",
         "staudenmeir/laravel-adjacency-list": "^1.0",
@@ -154,5 +156,17 @@
         }
     },
     "minimum-stability": "dev",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "path",
+            "url": "./packages/portabilis/i-educar-transport-package",
+            "symlink": true
+        },
+        {
+            "type": "path",
+            "url": "./packages/portabilis/pre-matricula-digital",
+            "symlink": true
+        }
+    ]
 }

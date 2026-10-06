@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\EnrollmentRequests\NativePhysicalGuard;
 use App\Exceptions\Enrollment\CancellationDateAfterAcademicYearException;
 use App\Exceptions\Enrollment\CancellationDateBeforeAcademicYearException;
 use App\Exceptions\Enrollment\EnrollDateAfterAcademicYearException;
@@ -190,6 +191,8 @@ class EnrollmentService
         DateTime $date,
         $isRelocatedSameClassGroup = false
     ) {
+        app(NativePhysicalGuard::class)->assertConfirmed($registration);
+
         if ($schoolClass->denyEnrollmentsWhenNoVacancy() && empty($schoolClass->vacancies)) {
             throw new NoVacancyException($schoolClass);
         }

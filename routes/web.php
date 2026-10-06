@@ -1,20 +1,68 @@
 <?php
 
+use App\Geo\MapConfig;
+use App\Http\Controllers\BcRegistrationRequestController;
 use App\Http\Controllers\EnrollmentInepController;
 use App\Http\Controllers\EnrollmentsPromotionController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\GeocodingController;
+use App\Http\Controllers\GuardianDocumentController;
+use App\Http\Controllers\PmdDocumentConfigurationController;
 use App\Http\Controllers\SchoolClassController;
 use App\Http\Controllers\SocialiteCallbackController;
 use App\Http\Controllers\SocialiteRedirectController;
 use App\Http\Controllers\TransferWebhookCallbackController;
 use App\Http\Controllers\WebController;
 use App\Http\Middleware\AnnouncementMiddleware;
+use App\Http\Middleware\BcRegistrationOperator;
 use App\Http\Middleware\ValidToken;
 use App\Process;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Auth::routes(['register' => false]);
+
+Route::get('/geo/config', fn () => response()->json(MapConfig::publicConfig()));
+
+Route::post('/geo/search', [GeocodingController::class, 'search'])->middleware('throttle:20,1');
+
+Route::prefix('matricula-digital')->name('bc-guardian.')->group(function () {
+    $guardian = GuardianDocumentController::class;
+    Route::get('/', [$guardian, 'show'])->name('show');
+    Route::get('/ficha', [$guardian, 'data'])->name('data');
+    Route::post('/ficha', [$guardian, 'updateData'])->name('data.update');
+    Route::get('/perfil', [$guardian, 'profile'])->name('profile');
+    Route::post('/inscricoes/{pmd}/selecionar', [$guardian, 'selectApplication'])->whereNumber('pmd')->name('select');
+    Route::post('/acesso', [$guardian, 'requestCode'])->name('access');
+    Route::post('/verificar', [$guardian, 'verify'])->name('verify');
+    Route::get('/demo', [$guardian, 'demo'])->name('demo');
+    Route::post('/sair', [$guardian, 'logout'])->name('logout');
+    Route::post('/modalidade', [$guardian, 'mode'])->name('mode');
+    Route::post('/documentos', [$guardian, 'upload'])->name('upload');
+    Route::get('/documentos/{document}/download', [$guardian, 'download'])->name('download');
+    Route::get('/pre-documentos/{document}/download', [$guardian, 'downloadEarly'])->name('download-early');
+});
+
+Route::middleware(['auth', BcRegistrationOperator::class])->prefix('bc/matriculas')->name('bc-registration.')->group(function () {
+    Route::post('/{registrationRequest}/conferencia-fisica', [BcRegistrationRequestController::class, 'reviewPhysical'])->name('physical.review');
+    $controller = BcRegistrationRequestController::class;
+    $configuration = PmdDocumentConfigurationController::class;
+    Route::get('/', [$controller, 'index'])->name('index');
+    Route::get('/efetivadas', [$controller, 'index'])->name('enrollments');
+    Route::get('/relatorio.csv', [$controller, 'export'])->name('export');
+    Route::get('/configuracao', [$configuration, 'index'])->name('configuration');
+    Route::post('/configuracao/tipos', [$configuration, 'createType'])->name('configuration.types.create');
+    Route::post('/configuracao/tipos/{type}', [$configuration, 'updateType'])->name('configuration.types.update');
+    Route::post('/configuracao/processos/{process}', [$configuration, 'updateProcess'])->name('configuration.processes.update');
+    Route::redirect('/pmd', '/pre-matricula-digital/inscricoes')->name('intake');
+    Route::get('/documentos/{document}/download', [$controller, 'download'])->name('download');
+    Route::post('/documentos/{document}/analise', [$controller, 'review'])->name('review');
+    Route::get('/{registrationRequest}', [$controller, 'show'])->name('show');
+    Route::post('/{registrationRequest}/dados/analise', [$controller, 'reviewData'])->name('data.review');
+    Route::post('/{registrationRequest}/acao', [$controller, 'action'])->name('action');
+    Route::post('/{registrationRequest}/documentos', [$controller, 'receive'])->name('receive');
+    Route::post('/{registrationRequest}/entrega-presencial', [$controller, 'receiveInPerson'])->name('receive-in-person');
+});
 
 Route::get('/', [WebController::class, 'home']);
 

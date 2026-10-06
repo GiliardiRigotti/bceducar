@@ -29,7 +29,10 @@ RUN apk add --update \
     postgresql-dev \
     unzip \
     openssh \
-    git
+    git \
+    openjdk8-jre \
+    fontconfig \
+    ttf-dejavu
 
 # https://github.com/docker-library/php/issues/436#issuecomment-303171390
 RUN apk add --no-cache --virtual .phpize_deps $PHPIZE_DEPS

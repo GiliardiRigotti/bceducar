@@ -1,0 +1,30 @@
+x-mail-test: &mail-test
+  MAIL_MAILER: smtp
+  MAIL_HOST: mailpit
+  MAIL_PORT: 1025
+  MAIL_USERNAME: ""
+  MAIL_PASSWORD: ""
+  MAIL_ENCRYPTION: ""
+  MAIL_FROM_ADDRESS: no-reply@bceducar.test
+  MAIL_FROM_NAME: BC Educar - teste local
+
+services:
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
+    environment:
+      MP_MAX_MESSAGES: 500
+  php:
+    environment:
+      <<: *mail-test
+  fpm:
+    environment:
+      <<: *mail-test
+  horizon:
+    environment:
+      <<: *mail-test
+  bc-deadlines:
+    environment:
+      <<: *mail-test

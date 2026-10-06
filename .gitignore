@@ -5,6 +5,7 @@
 /packages/*
 /public/modules
 /public/vendor/legacy/Reports
+/public/vendor/pre-matricula-digital
 /docker/jasper/
 /vendor
 /ieducar-*

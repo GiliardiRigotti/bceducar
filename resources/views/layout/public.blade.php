@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="utf-8">
-    <link rel="shortcut icon" href="{{ url('favicon.ico') }}">
+    <link rel="shortcut icon" href="{{ url('favicon.ico') }}?v=bc-20261005">
     <title>@if(isset($title)) {!! html_entity_decode($title) !!} - @endif {{ html_entity_decode(config('legacy.app.entity.name')) }} - i-Educar</title>
 
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans">
@@ -50,7 +50,7 @@
 <div id="main">
 
     <div>
-        <img alt="Logo" style="width: 150px" src="{{ config('legacy.config.ieducar_image') ?? url('intranet/imagens/brasao-republica.png') }}" >
+        <img alt="Brasão de Balneário Camboriú" style="width: 150px" src="{{ asset('img/brasao-balneario-camboriu.png') }}" >
     </div>
 
     <h1>{{ config('legacy.config.ieducar_entity_name') }}</h1>

@@ -31,6 +31,12 @@ class Kernel extends ConsoleKernel
         $schedule->command('notifications:delete')->saturdays()->dailyAt('04:00');
 
         $schedule->command('audit:reconcile')->dailyAt('03:30')->withoutOverlapping();
+
+        $schedule->command('bc:expire-registration-requests')->hourly()->withoutOverlapping();
+        $schedule->command('bc:monitor-physical-deadlines')->everyFiveMinutes()->withoutOverlapping();
+        $schedule->command('bc:queue-deadline-reminders')->everyFiveMinutes()->withoutOverlapping();
+        $schedule->command('bc:send-guardian-notices')->everyFiveMinutes()->withoutOverlapping();
+        $schedule->command('bc:send-guardian-messages')->everyFiveMinutes()->withoutOverlapping();
     }
 
     /**

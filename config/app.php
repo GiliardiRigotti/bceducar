@@ -207,6 +207,7 @@ return [
         RouteServiceProvider::class,
         AssetServiceProvider::class,
         HorizonServiceProvider::class,
+        App\Providers\BcPmdServiceProvider::class,
     ],
 
     /*

@@ -1,0 +1,2165 @@
+diff --git a/composer.json b/composer.json
+index 7dbf430..26bfd42 100644
+--- a/composer.json
++++ b/composer.json
+@@ -12,7 +12,7 @@
+         "nuwave/lighthouse": "^6.57",
+         "mll-lab/graphql-php-scalars": "^6",
+         "league/csv": "^9.6",
+-        "dex/frontier": "^0.16.0",
++        "dex/frontier": "^0.18.0",
+         "guzzlehttp/guzzle": "^7.7",
+         "laravel/sanctum": "^4.1"
+     },
+diff --git a/config/prematricula.php b/config/prematricula.php
+index 7c3fec3..d66d5d8 100644
+--- a/config/prematricula.php
++++ b/config/prematricula.php
+@@ -24,7 +24,7 @@ return [
+         'zoom' => 13,
+     ],
+ 
+-    'logo' => '/intranet/imagens/brasao-republica.png',
++    'logo' => '/img/brasao-balneario-camboriu.png',
+ 
+     'slogan' => 'Prefeitura Municipal de ',
+ 
+diff --git a/graphql/person.graphql b/graphql/person.graphql
+index d53a101..0ccc545 100644
+--- a/graphql/person.graphql
++++ b/graphql/person.graphql
+@@ -41,7 +41,7 @@ type Address {
+   complement: String
+   neighborhood: String!
+   city: String
+-  lat: Float! @rename(attribute: "latitude")
+-  lng: Float! @rename(attribute: "longitude")
++  lat: Float @rename(attribute: "latitude")
++  lng: Float @rename(attribute: "longitude")
+   manualChangeLocation: Boolean! @rename(attribute: "manual_change_location")
+ }
+diff --git a/graphql/preregistration.graphql b/graphql/preregistration.graphql
+index 69fad9a..280e60c 100644
+--- a/graphql/preregistration.graphql
++++ b/graphql/preregistration.graphql
+@@ -236,6 +236,9 @@ type PreRegistration {
+   responsible: Person @belongsTo
+   relationType: RelationType! @rename(attribute: "relation_type_id")
+   status: PreRegistrationStatus!
++  documentarySummary: BcDocumentSummary @field(resolver: "App\\EnrollmentRequests\\PmdDocumentSummary")
++  documentationStatus: String @rename(attribute: "documentation_status")
++  documentationDeadline: DateTime @rename(attribute: "documentation_deadline")
+   observation: String
+   fields: [PreRegistrationField!]! @hasMany
+   stage: ProcessStage @belongsTo
+@@ -353,8 +356,8 @@ input AddressInput {
+   city: String
+   stateAbbreviation: String
+   cityIbgeCode: Int
+-  lat: Float! @rename(attribute: "latitude")
+-  lng: Float! @rename(attribute: "longitude")
++  lat: Float @rename(attribute: "latitude")
++  lng: Float @rename(attribute: "longitude")
+   manualChangeLocation: Boolean! @rename(attribute: "manual_change_location")
+ }
+ 
+@@ -391,3 +394,20 @@ type LegacyStudent {
+   responsibleDateOfBirth: String @rename(attribute: "responsible_date_of_birth")
+   responsiblePhone: String @rename(attribute: "responsible_phone")
+ }
++
++"""
++Resumo documental exclusivo para operadores escolares autorizados.
++O token público PMD não autoriza leitura deste campo.
++"""
++type BcDocumentSummary {
++  released: Boolean!
++  label: String!
++  mode: String
++  deadline: DateTime
++  required: Int!
++  received: Int!
++  approved: Int!
++  corrections: Int!
++  enrolled: Boolean!
++  triageUrl: String
++}
+diff --git a/index.html b/index.html
+index 39e2048..10fa595 100644
+--- a/index.html
++++ b/index.html
+@@ -8,6 +8,7 @@
+       content="width=device-width, initial-scale=1, shrink-to-fit=no"
+     />
+ 
++    <link rel="icon" href="/favicon.ico?v=bc-20261005" />
+     <title>Pré-Matrícula Digital</title>
+     <link
+       rel="stylesheet"
+@@ -20,11 +21,7 @@
+     />
+     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@6.2.95/css/materialdesignicons.min.css" />
+     <script src="/config/prematricula.js"></script>
+-    <script
+-      async
+-      defer
+-      src="https://maps.googleapis.com/maps/api/js?key=<%= GOOGLE_API_KEY %>"
+-    ></script>
++
+   </head>
+   <body>
+     <noscript>
+diff --git a/package.json b/package.json
+index 38f1e74..8776d6c 100644
+--- a/package.json
++++ b/package.json
+@@ -30,6 +30,7 @@
+     "geolib": "^3.0.4",
+     "honeybadger-vue3-composition-api": "0.0.5",
+     "js-file-download": "^0.4.12",
++    "leaflet": "1.9.4",
+     "moment": "^2.30.1",
+     "pinia": "^2.0.13",
+     "pinia-plugin-persistedstate": "^1.5.1",
+@@ -48,7 +49,7 @@
+   },
+   "devDependencies": {
+     "@pinia/testing": "^1.0.1",
+-    "@types/google.maps": "^3.48.6",
++    "@types/leaflet": "^1.9.22",
+     "@types/node": "^24.0.4",
+     "@typescript-eslint/eslint-plugin": "^5.18.0",
+     "@typescript-eslint/parser": "^5.18.0",
+diff --git a/resources/ts/components/elements/Navbar.vue b/resources/ts/components/elements/Navbar.vue
+index 3f5073e..c46e0b9 100644
+--- a/resources/ts/components/elements/Navbar.vue
++++ b/resources/ts/components/elements/Navbar.vue
+@@ -7,7 +7,7 @@
+       to="/"
+       class="navbar-brand font-size-title-pmd-xs-16 flex-grow-lg-1 pl-0 pl-lg-4"
+     >
+-      <icon />
++      <img :src="'/img/brasao-balneario-camboriu.png'" alt="Brasão de Balneário Camboriú" width="32" height="38" style="object-fit: contain; margin-right: 8px" />
+       Pré-matrícula Digital
+     </router-link>
+     <x-btn
+@@ -34,7 +34,6 @@
+ 
+ <script setup lang="ts">
+ import { computed, ref, watch } from 'vue';
+-import Icon from '@/components/Icon.vue';
+ import PrivateMenu from '@/components/elements/PrivateMenu.vue';
+ import PrivateMenuDesktop from '@/components/elements/PrivateMenuDesktop.vue';
+ import PublicMenu from '@/components/elements/PublicMenu.vue';
+diff --git a/resources/ts/components/elements/PrivateMenu.vue b/resources/ts/components/elements/PrivateMenu.vue
+index 9f5dbae..869bd9b 100644
+--- a/resources/ts/components/elements/PrivateMenu.vue
++++ b/resources/ts/components/elements/PrivateMenu.vue
+@@ -9,6 +9,9 @@
+         Inscrições
+       </router-link>
+     </li>
++    <li v-if="store.isAuthenticated" class="nav-item mt-2 mt-lg-0 ml-0 ml-lg-3">
++      <a class="nav-link text-primary" href="/bc/matriculas" title="Etapa posterior ao deferimento da pré-matrícula">Triagem de documentos</a>
++    </li>
+     <li class="nav-item mt-2 mt-lg-0 ml-0 ml-lg-3">
+       <router-link
+         class="nav-link text-primary"
+diff --git a/resources/ts/components/elements/PrivateMenuDesktop.vue b/resources/ts/components/elements/PrivateMenuDesktop.vue
+index 4df3d0d..9e7f759 100644
+--- a/resources/ts/components/elements/PrivateMenuDesktop.vue
++++ b/resources/ts/components/elements/PrivateMenuDesktop.vue
+@@ -25,9 +25,8 @@
+         class="position-absolute bg-white border-radius-normal p-2 shadow-2"
+         style="min-width: 300px; right: 1.5em; left: auto"
+       >
++        <template v-for="(item, index) in items" :key="index + '-menu-item'">
+         <router-link
+-          v-for="(item, index) in items"
+-          :key="index + '-menu-item'"
+           :class="item.class"
+           :to="item.to"
+           active-class="active"
+@@ -37,6 +36,8 @@
+         >
+           {{ item.name }}
+         </router-link>
++        <a v-if="item.id === 1 && store.isAuthenticated" href="/bc/matriculas" class="nav-link text-primary mt-1" title="Etapa posterior ao deferimento da pré-matrícula" @click="show = false">Triagem de documentos</a>
++        </template>
+       </div>
+     </div>
+   </div>
+diff --git a/resources/ts/components/form/AddressFields.vue b/resources/ts/components/form/AddressFields.vue
+index 18451da..ecc35d9 100644
+--- a/resources/ts/components/form/AddressFields.vue
++++ b/resources/ts/components/form/AddressFields.vue
+@@ -20,7 +20,6 @@
+       type="TEXT"
+       :errors="checkError('address')"
+       :disabled="!canEditAddress"
+-      @blur="updateLatLng"
+     />
+     <x-field
+       ref="addressNumber"
+@@ -33,7 +32,6 @@
+       :errors="checkError('number')"
+       :disabled="!canEditAddress"
+       :loading="modelFetchingAddressLatLng"
+-      @blur="updateLatLng"
+     />
+     <x-field
+       v-model="modelData.complement"
+@@ -54,12 +52,15 @@
+       :errors="checkError('neighborhood')"
+       :disabled="!canEditAddress"
+     />
++    <x-field v-model="modelData.city" rules="required" container-class="form-group col-sm-9" label="Município" :name="`${name}.city`" type="TEXT" :errors="checkError('city')" />
++    <x-field v-model="modelData.stateAbbreviation" rules="required" container-class="form-group col-sm-3" label="UF" :name="`${name}.stateAbbreviation`" type="TEXT" :errors="checkError('stateAbbreviation')" />
++
+   </div>
+ </template>
+ 
+ <script setup lang="ts">
+-import { Address, Nullable } from '@/types';
+-import { computed, onMounted, ref } from 'vue';
++import { Address } from '@/types';
++import { computed, ref, watch } from 'vue';
+ import XField from '@/components/x-form/XField.vue';
+ import { useGeneralStore } from '@/store/general';
+ import { useVModel } from '@vueuse/core';
+@@ -89,10 +90,7 @@ const store = useGeneralStore();
+ 
+ const cityPostalCode = ref();
+ 
+-const lastAddress = ref<string>();
+-const lastNumber = ref<string>();
+ 
+-const geocoder = ref<google.maps.Geocoder>();
+ const modelData = useVModel(props, 'data');
+ const modelFetchingAddressLatLng = useVModel(props, 'fetchingAddressLatLng');
+ 
+@@ -107,9 +105,7 @@ const isCityPostalCode = () => {
+   );
+ };
+ 
+-const canEditAddress = computed(
+-  () => modelData.value.city && isCityPostalCode()
+-);
++const canEditAddress = computed(() => !modelData.value.city || isCityPostalCode());
+ 
+ const updateAddress = (data: {
+   logradouro: string;
+@@ -119,6 +115,8 @@ const updateAddress = (data: {
+   uf: string;
+   ibge: string;
+ }) => {
++  modelData.value.lat = undefined;
++  modelData.value.lng = undefined;
+   modelData.value.address = data.logradouro;
+   modelData.value.complement = data.complemento;
+   modelData.value.neighborhood = data.bairro;
+@@ -140,77 +138,25 @@ const updateAddress = (data: {
+       'O CEP deve ser do município',
+     ]);
+   } else {
+-    document.getElementsByName(`${props.name}.number`)[1].focus();
++    document.querySelector<HTMLInputElement>(`input[name="${props.name}.number"]`)?.focus();
+   }
+ };
+ 
+-const intervalLatLng = ref();
+-
+-const updateLatLng = () => {
+-  clearInterval(intervalLatLng.value);
+-
+-  if (
+-    modelData.value.address === lastAddress.value &&
+-    modelData.value.number === lastNumber.value
+-  ) {
+-    return;
+-  }
+-
+-  intervalLatLng.value = setTimeout(() => {
+-    if (modelFetchingAddressLatLng.value || !geocoder.value) {
+-      return;
+-    }
+-
+-    modelFetchingAddressLatLng.value = true;
+-    if (!modelData.value.address || !modelData.value.number) {
+-      modelFetchingAddressLatLng.value = false;
+-      return;
+-    }
+-    const address = [
+-      modelData.value.address,
+-      modelData.value.number,
+-      modelData.value.city,
+-      modelData.value.stateAbbreviation,
+-      modelData.value.postalCode,
+-    ]
+-      .filter((i) => i)
+-      .join(', ');
+-    geocoder.value.geocode(
+-      { address },
+-      (
+-        results: Nullable<google.maps.GeocoderResult[]>,
+-        status: google.maps.GeocoderStatus
+-      ) => {
+-        if (status === 'OK' && results) {
+-          modelData.value.lat = results[0].geometry.location.lat();
+-          modelData.value.lng = results[0].geometry.location.lng();
+-          props.setFieldValue(
+-            `${props.name}.lat`,
+-            modelData.value.lat as number
+-          );
+-          props.setFieldValue(
+-            `${props.name}.lng`,
+-            modelData.value.lng as number
+-          );
+-          lastAddress.value = modelData.value.address;
+-          lastNumber.value = modelData.value.number;
+-        }
+-      }
+-    );
+-    modelFetchingAddressLatLng.value = false;
+-  }, 1000);
+-};
++// An address is sufficient; geographic coordinates are optional metadata.
++watch(() => [modelData.value.postalCode, modelData.value.address, modelData.value.number,
++  modelData.value.neighborhood, modelData.value.city, modelData.value.stateAbbreviation], () => {
++  modelData.value.lat = undefined;
++  modelData.value.lng = undefined;
++  modelData.value.manualChangeLocation = false;
++});
++modelFetchingAddressLatLng.value = false;
+ 
+ const checkError = (name: string) => {
+   return Boolean(
+-    props.errors[`${name}.postalCode` as keyof typeof props.errors]
++    props.errors[`${props.name}.${name}`]
+   );
+ };
+ 
+-onMounted(() => {
+-  geocoder.value = new google.maps.Geocoder();
+-});
+-
+ const ctx = {
+   isCityPostalCode,
+ };
+diff --git a/resources/ts/components/form/InputPostalCode.vue b/resources/ts/components/form/InputPostalCode.vue
+index 2739ba3..76f8a03 100644
+--- a/resources/ts/components/form/InputPostalCode.vue
++++ b/resources/ts/components/form/InputPostalCode.vue
+@@ -17,20 +17,20 @@
+         no-caps
+         no-wrap
+         :loading="loading"
++        :disable="disabled"
+         loading-normal
+         @click="search"
+       />
+     </div>
+   </div>
++  <p v-if="notFound" role="status" class="text-muted">CEP não encontrado ou busca indisponível. Preencha o endereço, município e UF manualmente.</p>
+ </template>
+ 
+ <script lang="ts">
+-import { PropType, computed, defineComponent, onMounted, ref } from 'vue';
+-import { Nullable } from '@/types';
++import { PropType, computed, defineComponent, ref } from 'vue';
+ import XBtn from '@/components/elements/buttons/XBtn.vue';
+ import axios from 'axios';
+ import { mask } from 'vue-the-mask';
+-import { useGeneralStore } from '@/store/general';
+ export default defineComponent({
+   components: {
+     XBtn,
+@@ -46,71 +46,38 @@ export default defineComponent({
+   },
+   emits: ['change:address', 'notFound'],
+   setup(props, { attrs, emit }) {
+-    const store = useGeneralStore();
+ 
+-    const geocoder = ref<google.maps.Geocoder>();
+     const mask = ref('#####-###');
+     const loading = ref(false);
++    const notFound = ref(false);
+ 
+     const onlyNumbers = computed(() =>
+-      attrs.cep ? (attrs.cep as string).replace(/[^[0-9]]*/, '') : ''
++      attrs.cep ? (attrs.cep as string).replace(/\D/g, '') : ''
+     );
+     const disabled = computed(() => onlyNumbers.value.length < 8);
+ 
+     const search = async () => {
++      if (disabled.value) return;
++      notFound.value = false;
+       loading.value = true;
+       axios
+-        .get(`https://viacep.com.br/ws/${onlyNumbers.value}/json/`)
++        .get(`https://viacep.com.br/ws/${onlyNumbers.value}/json/`, { timeout: 8000 })
+         .then((res) => {
+           if (res.data.erro) {
+-            searchFromGoogle();
++            notifyNotFound();
+           } else {
+             emit('change:address', res.data);
+           }
+         })
+         .catch(() => {
+-          emit('notFound');
++          notifyNotFound();
+         })
+         .finally(() => {
+           loading.value = false;
+         });
+     };
+ 
+-    const searchFromGoogle = () => {
+-      if (!geocoder.value) return;
+-
+-      const address = /* ${model.value},  */ `${store.entity.city}, ${store.entity.state}`;
+-
+-      geocoder.value.geocode(
+-        { address },
+-        (
+-          results: Nullable<google.maps.GeocoderResult[]>,
+-          status: google.maps.GeocoderStatus
+-        ) => {
+-          if (status === 'OK' && results) {
+-            const { formatted_address: result } = results[0];
+-            const city = result.includes(store.entity.city);
+-            const state = result.includes(store.entity.state);
+-            if (city && state) {
+-              emit('change:address', {
+-                logradouro: null,
+-                complemento: null,
+-                bairro: null,
+-                localidade: store.entity.city,
+-                uf: store.entity.state,
+-                ibge: null,
+-              });
+-              return;
+-            }
+-          }
+-          emit('notFound');
+-        }
+-      );
+-    };
+-
+-    onMounted(() => {
+-      geocoder.value = new google.maps.Geocoder();
+-    });
++    const notifyNotFound = () => { notFound.value = true; emit('notFound'); };
+ 
+     return {
+       mask,
+@@ -118,6 +85,7 @@ export default defineComponent({
+       search,
+       onlyNumbers,
+       disabled,
++      notFound,
+     };
+   },
+ });
+diff --git a/resources/ts/components/maps/GoogleMaps.vue b/resources/ts/components/maps/GoogleMaps.vue
+deleted file mode 100644
+index e262ac4..0000000
+--- a/resources/ts/components/maps/GoogleMaps.vue
++++ /dev/null
+@@ -1,99 +0,0 @@
+-<template>
+-  <div class="google-map">
+-    <div ref="map" class="google-map-container"></div>
+-    <template v-if="Boolean(googleInstance) && Boolean(mapInstance)">
+-      <slot name="default" :map="mapInstance"></slot>
+-    </template>
+-  </div>
+-</template>
+-
+-<script setup lang="ts">
+-import { computed, onMounted, ref, watch } from 'vue';
+-
+-const props = withDefaults(
+-  defineProps<{
+-    config: Record<string, unknown>;
+-    lat: number;
+-    lng: number;
+-    zoom: number;
+-  }>(),
+-  {
+-    config: () => ({}),
+-    lat: 0,
+-    lng: 0,
+-    zoom: 10,
+-  }
+-);
+-
+-const googleInstance = ref<typeof window.google>();
+-const map = ref<HTMLElement>();
+-const mapInstance = ref<google.maps.Map>();
+-
+-const initialize = (googleParam: typeof window.google) => {
+-  googleInstance.value = googleParam;
+-
+-  const config = Object.assign(props.config, {
+-    center: {
+-      lat: props.lat,
+-      lng: props.lng,
+-    },
+-    zoom: props.zoom,
+-  });
+-
+-  mapInstance.value = new googleInstance.value.maps.Map(
+-    map.value as HTMLElement,
+-    config
+-  );
+-};
+-
+-const setCenter = () => {
+-  mapInstance.value?.setCenter({
+-    lat: props.lat,
+-    lng: props.lng,
+-  });
+-};
+-
+-const reactiveLat = computed(() => props.lat);
+-const reactiveLng = computed(() => props.lng);
+-
+-watch([reactiveLat, reactiveLng], () => {
+-  setCenter();
+-});
+-
+-onMounted(() => {
+-  initialize(window.google);
+-});
+-</script>
+-
+-<style scoped>
+-@keyframes spinner {
+-  to {
+-    transform: rotate(360deg);
+-  }
+-}
+-
+-.google-map {
+-  position: relative;
+-}
+-
+-.google-map::before {
+-  content: '';
+-  box-sizing: border-box;
+-  position: absolute;
+-  top: 50%;
+-  left: 50%;
+-  width: 30px;
+-  height: 30px;
+-  margin-top: -15px;
+-  margin-left: -15px;
+-  border-radius: 50%;
+-  border: 1px solid #ccc;
+-  border-top-color: #07d;
+-  animation: spinner 0.6s linear infinite;
+-}
+-
+-.google-map-container {
+-  min-height: 100%;
+-  width: 100%;
+-}
+-</style>
+diff --git a/resources/ts/components/maps/GoogleMapsMarker.vue b/resources/ts/components/maps/GoogleMapsMarker.vue
+deleted file mode 100644
+index e166a75..0000000
+--- a/resources/ts/components/maps/GoogleMapsMarker.vue
++++ /dev/null
+@@ -1,111 +0,0 @@
+-<template>
+-  <div style="display: none">
+-    <slot name="default"></slot>
+-  </div>
+-</template>
+-
+-<script setup lang="ts">
+-import {
+-  ComponentInternalInstance,
+-  computed,
+-  getCurrentInstance,
+-  onBeforeUnmount,
+-  onMounted,
+-  ref,
+-  watch,
+-} from 'vue';
+-import { GoogleMapsMarker, LatLng } from '@/types';
+-
+-const emit = defineEmits<{
+-  (action: 'new-position', payload: LatLng): void;
+-}>();
+-
+-const props = defineProps<{
+-  map: google.maps.Map;
+-  marker: GoogleMapsMarker;
+-  draggable?: boolean;
+-}>();
+-
+-const vm = getCurrentInstance() as ComponentInternalInstance;
+-const internalMarker = ref<google.maps.Marker>();
+-
+-const draggableConfig = {
+-  icon: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+-};
+-
+-const config = computed(() => {
+-  const dConfig = props.draggable ? draggableConfig : {};
+-
+-  return {
+-    ...(props.marker.config || {}),
+-    ...dConfig,
+-  };
+-});
+-
+-onMounted(() => {
+-  internalMarker.value = new google.maps.Marker({
+-    position: props.marker.position,
+-    map: props.map,
+-    draggable: props.draggable,
+-    ...config.value,
+-  });
+-
+-  if (vm.proxy?.$el.innerHTML.length) {
+-    const infowindow = new google.maps.InfoWindow({
+-      content: vm.proxy?.$el.innerHTML,
+-    });
+-
+-    internalMarker.value?.addListener('click', () => {
+-      infowindow.open(props.map, internalMarker.value);
+-    });
+-  }
+-
+-  internalMarker.value?.addListener('click', () => {
+-    vm.proxy?.$emit('click', props.marker);
+-  });
+-
+-  internalMarker.value?.addListener(
+-    'dragend',
+-    (event: { latLng: google.maps.LatLng }) => {
+-      emit('new-position', {
+-        lat: event.latLng.lat(),
+-        lng: event.latLng.lng(),
+-      });
+-    }
+-  );
+-
+-  if (props.draggable) {
+-    google.maps.event.addListener(
+-      props.map,
+-      'click',
+-      (event: { latLng: google.maps.LatLng }) => {
+-        internalMarker.value?.setPosition(event.latLng);
+-        emit('new-position', {
+-          lat: event.latLng.lat(),
+-          lng: event.latLng.lng(),
+-        });
+-      }
+-    );
+-  }
+-});
+-
+-const reactiveLat = computed(() => props.marker.position?.lat);
+-const reactiveLng = computed(() => props.marker.position?.lng);
+-
+-watch(
+-  [reactiveLat, reactiveLng],
+-  () => {
+-    internalMarker.value?.setPosition(props.marker.position);
+-  },
+-  { deep: true }
+-);
+-
+-onBeforeUnmount(() => {
+-  internalMarker.value?.setVisible(false);
+-});
+-
+-defineExpose({
+-  internalMarker,
+-  marker: props.marker,
+-});
+-</script>
+diff --git a/resources/ts/components/maps/GoogleMapsMarkers.vue b/resources/ts/components/maps/GoogleMapsMarkers.vue
+deleted file mode 100644
+index 61ea7ed..0000000
+--- a/resources/ts/components/maps/GoogleMapsMarkers.vue
++++ /dev/null
+@@ -1,70 +0,0 @@
+-<template>
+-  <div style="display: none">
+-    <google-maps-marker-component
+-      v-for="marker in markers"
+-      :ref="gmarker"
+-      :key="marker.id"
+-      :map="map"
+-      :marker="marker"
+-      @click="$emit('click', $event)"
+-    >
+-      <slot name="default" :map="map" :marker="marker"></slot>
+-    </google-maps-marker-component>
+-  </div>
+-</template>
+-
+-<script setup lang="ts">
+-import { computed, ref, watch } from 'vue';
+-import { GoogleMapsMarker } from '@/types';
+-import GoogleMapsMarkerComponent from './GoogleMapsMarker.vue';
+-
+-interface ChildrenNode {
+-  map: google.maps.Map;
+-  markers: GoogleMapsMarker[];
+-  marker: GoogleMapsMarker;
+-  internalMarker: google.maps.Marker;
+-}
+-
+-defineEmits<{
+-  (action: 'click', payload: MouseEvent): void;
+-}>();
+-
+-const props = defineProps<{
+-  map: google.maps.Map;
+-  markers: GoogleMapsMarker[];
+-}>();
+-
+-const children = ref<ChildrenNode[]>([]);
+-
+-const gmarker = (el: unknown) => {
+-  if (el) {
+-    children.value.push(el as unknown as ChildrenNode);
+-  }
+-};
+-
+-const reactiveMarkers = computed(() => props.markers);
+-
+-watch(
+-  reactiveMarkers,
+-  (newMarkers, oldMarkers) => {
+-    const newIds = newMarkers.map((marker) => marker.id);
+-    const oldIds = oldMarkers
+-      .map((marker) => marker.id)
+-      .filter((id) => !newIds.includes(id));
+-
+-    children.value.forEach((component) => {
+-      if (oldIds.includes(component.marker.id)) {
+-        component.internalMarker.setVisible(false);
+-      }
+-
+-      if (newIds.includes(component.marker.id)) {
+-        component.internalMarker.setVisible(true);
+-        component.internalMarker.setPosition(component.marker.position);
+-      }
+-    });
+-  },
+-  {
+-    deep: true,
+-  }
+-);
+-</script>
+diff --git a/resources/ts/components/x-form/XForm.vue b/resources/ts/components/x-form/XForm.vue
+index 7bf427a..7e9d72e 100644
+--- a/resources/ts/components/x-form/XForm.vue
++++ b/resources/ts/components/x-form/XForm.vue
+@@ -1,9 +1,9 @@
+ <template>
+-  <FormComponent v-slot="slot" ref="form" :initial-values="iniValues" as="div">
++  <FormComponent v-slot="slot" ref="form" :initial-values="iniValues" as="div" @invalid-submit="handleInvalidSubmit">
+     <form
+       class="row"
+       autocomplete="off"
+-      @submit.prevent.stop="handleSubmit(slot)"
++      @submit.prevent.stop="handleSubmit(slot, $event)"
+     >
+       <template v-for="field in schema.fields" :key="field.name">
+         <x-field
+@@ -28,6 +28,13 @@
+ 
+       <slot v-bind="slot" name="default" />
+ 
++      <div v-if="validationAttempted && Object.keys(slot.errors).length" class="col-12 alert alert-danger mt-3" role="alert">
++        <p>Não foi possível prosseguir. Confira os campos abaixo:</p>
++        <ul class="mb-0">
++          <li v-for="(message, name) in slot.errors" :key="name">{{ fieldLabel(name) }}: {{ message }}</li>
++        </ul>
++      </div>
++
+       <div v-if="schema.buttons" class="col-12">
+         <div :class="schema.buttonsContainer.class">
+           <div
+@@ -50,7 +57,7 @@
+             <x-btn
+               v-else
+               :label="button.label"
+-              :disabled="disableProceed"
++              :disable="disableProceed"
+               :loading="loading"
+               :class="button.class"
+               class="w-100 h-100 flex-row justify-content-center"
+@@ -60,7 +67,7 @@
+               no-wrap
+               loading-normal
+               v-bind="button.bind"
+-              @click="handleSubmit(slot)"
++              @click="handleSubmit(slot, $event)"
+             />
+           </div>
+         </div>
+@@ -71,7 +78,7 @@
+ 
+ <script lang="ts">
+ import { FormSchema, HandleSubmit } from '@/types';
+-import { PropType, computed, defineComponent } from 'vue';
++import { PropType, computed, defineComponent, ref } from 'vue';
+ import { Form as FormComponent } from 'vee-validate';
+ import XBtn from '@/components/elements/buttons/XBtn.vue';
+ import XField from '@/components/x-form/XField.vue';
+@@ -129,8 +136,17 @@ class XFormFactory<T> {
+         loading: Boolean,
+         disableProceed: Boolean,
+       },
+-      emits: ['submit', 'open:options', 'close:options'],
++      emits: ['submit', 'invalid-submit', 'open:options', 'close:options'],
+       setup(props, { emit }) {
++        const validationAttempted = ref(false);
++        const handleInvalidSubmit = ({ errors }: { errors: Record<string, string> }) => {
++          validationAttempted.value = true;
++          emit('invalid-submit', errors);
++        };
++        const fieldLabel = (name: string) => {
++          const label = Array.from(document.getElementsByTagName('label')).find(label => label.htmlFor === name);
++          return label?.textContent?.trim() || props.schema.fields.find(field => field.name === name)?.label || name;
++        };
+         const iniValues = computed(() => {
+           let values = {};
+           props.schema.fields.forEach((s) => {
+@@ -145,9 +161,9 @@ class XFormFactory<T> {
+           };
+         });
+ 
+-        const handleSubmit = (slot: { handleSubmit: HandleSubmit }) => {
+-          slot.handleSubmit(
+-            () => null,
++        const handleSubmit = (slot: { handleSubmit: HandleSubmit }, event: Event) => {
++          return slot.handleSubmit(
++            event,
+             (values: Record<string, unknown>, opt) => {
+               emit('submit', values as T, opt);
+             }
+@@ -156,6 +172,9 @@ class XFormFactory<T> {
+ 
+         return {
+           handleSubmit,
++          handleInvalidSubmit,
++          validationAttempted,
++          fieldLabel,
+           iniValues,
+         };
+       },
+diff --git a/resources/ts/filters/index.ts b/resources/ts/filters/index.ts
+index f79d340..0a74e77 100644
+--- a/resources/ts/filters/index.ts
++++ b/resources/ts/filters/index.ts
+@@ -1,4 +1,4 @@
+-import { Address, GoogleMapsMarker } from '@/types';
++import { Address, GeoMarkerData } from '@/types';
+ import {
+   getFormattedDate,
+   getFormattedDateTime,
+@@ -20,7 +20,7 @@ export interface Filters {
+   joinAddressLine1: (address: Address) => string;
+   joinAddressLine2: (address: Address) => string;
+   joinAddressLine3: (address: Address) => string;
+-  markerAddress: () => GoogleMapsMarker;
++  markerAddress: () => GeoMarkerData;
+ }
+ 
+ const filters: Filters = {
+diff --git a/resources/ts/modules/preregistration/api/services/graphql/preregistration.ts b/resources/ts/modules/preregistration/api/services/graphql/preregistration.ts
+index 9f04988..9675e33 100644
+--- a/resources/ts/modules/preregistration/api/services/graphql/preregistration.ts
++++ b/resources/ts/modules/preregistration/api/services/graphql/preregistration.ts
+@@ -859,7 +859,8 @@ export const listByProtocol = (data: {
+           protocol
+           status
+           type
+-          observation
++          documentarySummary { released label mode deadline required received approved corrections enrolled triageUrl }
++            observation
+           grade {
+             id
+             name
+diff --git a/resources/ts/modules/preregistration/components/PreRegistration.vue b/resources/ts/modules/preregistration/components/PreRegistration.vue
+index f203bd9..09d45dc 100644
+--- a/resources/ts/modules/preregistration/components/PreRegistration.vue
++++ b/resources/ts/modules/preregistration/components/PreRegistration.vue
+@@ -131,6 +131,7 @@
+ </template>
+ 
+ <script setup lang="ts">
++import { mergeAddressFields } from '../addressTransition';
+ import {
+   AppContext,
+   computed,
+@@ -392,18 +393,20 @@ const next = async (
+       responsible.value.responsible_phone = student.value.responsible_phone;
+     }
+   } else if (step.value === 'RESPONSIBLE') {
+-    if (
+-      (!model.address.lat && !model.address.lng) ||
+-      (model.address.lat === 0 && model.address.lng === 0)
+-    ) {
+-      return;
+-    }
+-
+-    responsible.value = { ...responsible.value, ...model };
++    const secondary = responsible.value.useSecondAddress;
++    responsible.value = {
++      ...responsible.value,
++      ...model,
++      address: mergeAddressFields(responsible.value.address, model.address),
++      secondAddress: secondary
++        ? mergeAddressFields(responsible.value.secondAddress, model.secondAddress)
++        : responsible.value.secondAddress,
++    };
+     ctx.saveOnStorage();
+     step.value = 'STUDENT';
+   } else if (step.value === 'STUDENT') {
+     student.value = { ...student.value, ...model };
++    student.value.waitingList = stagePayload.value.stage.type === 'WAITING_LIST' ? student.value.waitingList.slice(0, 1) : [];
+     ctx.saveOnStorage();
+ 
+     let canNext = ctx.submitToReview();
+diff --git a/resources/ts/modules/preregistration/components/PreRegistrationBatch.vue b/resources/ts/modules/preregistration/components/PreRegistrationBatch.vue
+index 70bd1e1..2e63f24 100644
+--- a/resources/ts/modules/preregistration/components/PreRegistrationBatch.vue
++++ b/resources/ts/modules/preregistration/components/PreRegistrationBatch.vue
+@@ -18,7 +18,7 @@
+           </div>
+           <div v-if="step === 'ACCEPT'" class="mt-4 font-weight-bold">
+             Selecione a turma que deseja matricular os(as) alunos(as) para
+-            completar o deferimento das pré-matrículas dos(as) alunos(as).
++            completar o deferimento das pré-matrículas dos(as) alunos(as). Esta ação libera a documentação; as matrículas serão efetivadas depois da conferência dos documentos.
+             <hr />
+             <x-field
+               v-model="classroom"
+diff --git a/resources/ts/modules/preregistration/components/PreRegistrationEditModal.vue b/resources/ts/modules/preregistration/components/PreRegistrationEditModal.vue
+index 66d4244..9d5c34b 100644
+--- a/resources/ts/modules/preregistration/components/PreRegistrationEditModal.vue
++++ b/resources/ts/modules/preregistration/components/PreRegistrationEditModal.vue
+@@ -106,7 +106,7 @@
+                 <div class="row">
+                   <div class="col-12">
+                     <x-card bordered>
+-                      <google-maps
++                      <geo-map
+                         :config="store.map.config"
+                         :lat="store.map.center.lat"
+                         :lng="store.map.center.lng"
+@@ -115,9 +115,10 @@
+                         tabindex="-1"
+                       >
+                         <template #default="{ map }">
+-                          <google-maps-markers
++                          <geo-markers
+                             :markers="markerClosestSchools"
+-                            :map="(map as google.maps.Map)"
++                            fit-bounds
++                            :map="(map)"
+                             @click="selectFirstSchool"
+                           >
+                             <template #default="{ marker: markerSlot }">
+@@ -125,9 +126,9 @@
+                                 <strong>{{ markerSlot.name }}</strong>
+                               </div>
+                             </template>
+-                          </google-maps-markers>
+-                          <google-maps-marker-component
+-                            :map="(map as google.maps.Map)"
++                          </geo-markers>
++                          <geo-marker-component
++                            :map="(map)"
+                             :marker="marker"
+                           >
+                             <template #default>
+@@ -135,9 +136,9 @@
+                                 <strong>Sua residência</strong>
+                               </div>
+                             </template>
+-                          </google-maps-marker-component>
++                          </geo-marker-component>
+                         </template>
+-                      </google-maps>
++                      </geo-map>
+                     </x-card>
+                   </div>
+                 </div>
+@@ -249,7 +250,7 @@
+ </template>
+ 
+ <script setup lang="ts">
+-import { Address, GoogleMapsMarker, Nullable, Option } from '@/types';
++import { Address, GeoMarkerData, Nullable, Option } from '@/types';
+ import {
+   Fields as FieldsFields,
+   PreRegistration,
+@@ -267,9 +268,9 @@ import { useRoute, useRouter } from 'vue-router';
+ import AddressFields from '@/components/form/AddressFields.vue';
+ import Fields from '@/components/form/Fields.vue';
+ import { Filters } from '@/filters';
+-import GoogleMaps from '@/components/maps/GoogleMaps.vue';
+-import GoogleMapsMarkerComponent from '@/components/maps/GoogleMapsMarker.vue';
+-import GoogleMapsMarkers from '@/components/maps/GoogleMapsMarkers.vue';
++import GeoMap from '@/components/maps/GeoMap.vue';
++import GeoMarkerComponent from '@/components/maps/GeoMarker.vue';
++import GeoMarkers from '@/components/maps/GeoMarkers.vue';
+ import ModalComponent from '@/components/elements/Modal.vue';
+ import { Preregistration as PreregistrationApi } from '@/modules/preregistration/api';
+ import XBtn from '@/components/elements/buttons/XBtn.vue';
+@@ -535,8 +536,8 @@ const schoolLabels = computed(() => {
+   }));
+ });
+ 
+-const markerClosestSchools = computed<GoogleMapsMarker[]>(
+-  (): GoogleMapsMarker[] => allSchools.value as unknown as GoogleMapsMarker[]
++const markerClosestSchools = computed<GeoMarkerData[]>(
++  (): GeoMarkerData[] => allSchools.value as unknown as GeoMarkerData[]
+ );
+ 
+ const selectFirstSchool = (school: MouseEvent) => {
+@@ -547,7 +548,7 @@ const selectFirstSchool = (school: MouseEvent) => {
+   ).id;
+ };
+ 
+-const marker = computed<GoogleMapsMarker>(
++const marker = computed<GeoMarkerData>(
+   () =>
+     ({
+       ...markerAddress(),
+@@ -555,7 +556,7 @@ const marker = computed<GoogleMapsMarker>(
+         lat: latitude.value,
+         lng: longitude.value,
+       },
+-    } as unknown as GoogleMapsMarker)
++    } as unknown as GeoMarkerData)
+ );
+ 
+ const reactiveRoute = computed(() => route);
+diff --git a/resources/ts/modules/preregistration/components/PreRegistrationModal.vue b/resources/ts/modules/preregistration/components/PreRegistrationModal.vue
+index 675735c..0303379 100644
+--- a/resources/ts/modules/preregistration/components/PreRegistrationModal.vue
++++ b/resources/ts/modules/preregistration/components/PreRegistrationModal.vue
+@@ -64,8 +64,8 @@
+           </div>
+         </div>
+         <div v-if="step === 'ACCEPT'" class="mt-4 font-weight-bold">
+-          Selecione a turma que deseja matricular o(a) aluno(a) para completar o
+-          deferimento da pré-matrícula do(a) aluno(a).
++          Selecione a turma para completar o
++          deferimento da pré-matrícula do(a) aluno(a). Esta ação libera a documentação; a matrícula só será efetivada depois da conferência dos documentos.
+           <hr />
+         </div>
+         <div v-if="preregistration.status === 'REJECTED'">
+@@ -88,7 +88,7 @@
+           "
+         >
+           <div class="mt-4 font-weight-bold" style="color: #1900b4">
+-            Em convocação
++            Aguardando documentação
+           </div>
+           <div class="row mt-4">
+             <dl class="col-12">
+@@ -101,7 +101,7 @@
+           <hr />
+         </div>
+         <div v-if="preregistration.status === 'ACCEPTED'">
+-          <div class="mt-4 text-success font-weight-bold">Deferido</div>
++          <div class="mt-4 text-success font-weight-bold">Matrícula efetivada</div>
+           <div class="row mt-4">
+             <dl class="col-6">
+               <dt class="font-hind font-size-10">Escola</dt>
+@@ -545,6 +545,7 @@
+           <span v-html="error"></span>
+         </div>
+       </div>
++      <documentary-summary v-if="!preregistrationEmpty" :summary="preregistration.documentarySummary" :intake="step !== 'SHOW' || preregistration.status === 'WAITING'" />
+     </template>
+     <template #footer>
+       <div
+@@ -675,7 +676,7 @@
+           color="accepted"
+           outline
+           class="ml-2 mr-2 mb-2 mb-lg-0"
+-          label="Deferir"
++          label="Deferir pré-matrícula"
+           icon="pmd-accepted"
+           no-wrap
+           no-caps
+@@ -688,6 +689,7 @@
+ </template>
+ 
+ <script setup lang="ts">
++import DocumentarySummary from './DocumentarySummary.vue';
+ import { ErrorResponse, Option } from '@/types';
+ import {
+   Fields,
+diff --git a/resources/ts/modules/preregistration/components/Review.vue b/resources/ts/modules/preregistration/components/Review.vue
+index fe3ce48..5fee9a8 100644
+--- a/resources/ts/modules/preregistration/components/Review.vue
++++ b/resources/ts/modules/preregistration/components/Review.vue
+@@ -105,13 +105,13 @@
+         </dd>
+       </dl>
+       <dl v-if="student.school" class="col-sm-12">
+-        <dt class="font-hind font-size-10">Escola</dt>
++        <dt class="font-hind font-size-10">1ª opção de escola</dt>
+         <dd>
+           {{ school(student.school) }}
+         </dd>
+       </dl>
+       <dl v-if="student.secondSchool" class="col-sm-12">
+-        <dt class="font-hind font-size-10">Escola (lista de espera)</dt>
++        <dt class="font-hind font-size-10">Outras opções de escola (lista de espera)</dt>
+         <dd>
+           <div>
+             {{ school(student.secondSchool) }} ({{
+diff --git a/resources/ts/modules/preregistration/components/StudentFields.vue b/resources/ts/modules/preregistration/components/StudentFields.vue
+index 784246b..1191c5f 100644
+--- a/resources/ts/modules/preregistration/components/StudentFields.vue
++++ b/resources/ts/modules/preregistration/components/StudentFields.vue
+@@ -204,11 +204,12 @@
+         </div>
+       </template>
+       <template v-if="haveSchoolsWithVacancies && !isWaitingList">
++        <p class="col-12 mt-3">Os pins azuis mostram todas as unidades disponíveis para a série e o turno selecionados, com seus nomes.</p>
+         <x-field
+           v-model="modelStudent.school"
+           container-class="col-12 mt-3"
+           rules="required"
+-          label="Escola"
++          label="1ª opção de escola"
+           name="school"
+           type="SELECT"
+           :options="closestSchools"
+@@ -218,9 +219,7 @@
+         <select-address-position
+           v-model:adjusted="adjustedAddressPosition"
+           v-model:old="oldAddressPosition"
+-          :allow-responsible-select-map-address="
+-            modelStage.process.allowResponsibleSelectMapAddress
+-          "
++          :allow-responsible-select-map-address="false"
+           :old-address-postition="oldAddressPosition"
+           :is-using-second-address="isUsingSecondAddress"
+           @undo-address-position="handleUndoAddressPosition(oldAddressPosition)"
+@@ -241,7 +240,7 @@
+           <template #map="{ adjustAddress, setNewPosition }">
+             <div class="col-12">
+               <x-card bordered>
+-                <google-maps
++                <geo-map
+                   :config="store.map.config"
+                   :lat="lat"
+                   :lng="lng"
+@@ -250,9 +249,10 @@
+                   tabindex="-1"
+                 >
+                   <template #default="{ map }">
+-                    <google-maps-markers
++                    <geo-markers
+                       :markers="markerClosestSchools"
+-                      :map="(map as google.maps.Map)"
++                      :map="(map)"
++                      fit-bounds
+                       @click="selectFirstSchool"
+                     >
+                       <template #default="{ marker: markerSlot }">
+@@ -260,10 +260,10 @@
+                           <strong>{{ markerSlot.name }}</strong>
+                         </div>
+                       </template>
+-                    </google-maps-markers>
+-                    <google-maps-marker-component
+-                      v-if="selectedAddress"
+-                      :map="(map as google.maps.Map)"
++                    </geo-markers>
++                    <geo-marker-component
++                      v-if="hasAddressCoordinates"
++                      :map="(map)"
+                       :marker="marker"
+                     >
+                       <template #default>
+@@ -271,10 +271,10 @@
+                           <strong>Sua residência</strong>
+                         </div>
+                       </template>
+-                    </google-maps-marker-component>
+-                    <google-maps-marker-component
++                    </geo-marker-component>
++                    <geo-marker-component
+                       v-if="adjustAddress"
+-                      :map="(map as google.maps.Map)"
++                      :map="(map)"
+                       :marker="markerAdjustedAddress"
+                       draggable
+                       @new-position="setNewPosition"
+@@ -284,9 +284,9 @@
+                           <strong>Novo ponto de referência</strong>
+                         </div>
+                       </template>
+-                    </google-maps-marker-component>
++                    </geo-marker-component>
+                   </template>
+-                </google-maps>
++                </geo-map>
+               </x-card>
+             </div>
+           </template>
+@@ -299,7 +299,7 @@
+         <x-btn
+           class="w-100"
+           color="primary"
+-          label="Selecionar uma escola para aguardar na lista de espera"
++          label="Selecionar a 2ª opção de escola"
+           no-caps
+           no-wrap
+           @click="setUseSecondSchool"
+@@ -307,7 +307,7 @@
+       </div>
+       <template v-if="showWaitingListOption">
+         <div class="col-12 mt-4">
+-          Selecione qual escola deseja ficar em lista de espera
++          Escolha uma segunda escola como alternativa, conforme as regras da lista de espera.
+         </div>
+         <x-field
+           v-if="!isWaitingList"
+@@ -325,7 +325,7 @@
+           v-model="modelStudent.secondSchool"
+           container-class="col-12"
+           rules="required"
+-          label="Escola (lista de espera)"
++          :label="isWaitingList ? '1ª opção de escola (lista de espera)' : '2ª opção de escola (lista de espera)'"
+           name="secondSchool"
+           type="SELECT"
+           :options="
+@@ -341,10 +341,7 @@
+         <select-address-position
+           v-model:adjusted="adjustedWaitingListAddressPosition"
+           v-model:old="oldWaitingListAddressPosition"
+-          :allow-responsible-select-map-address="
+-            modelStage.process.allowResponsibleSelectMapAddress &&
+-            !modelStudent.useSecondSchool
+-          "
++          :allow-responsible-select-map-address="false"
+           :old-address-postition="oldAddressPosition"
+           :is-using-second-address="isUsingSecondAddress"
+           @undo-address-position="
+@@ -367,7 +364,7 @@
+           <template #map="{ adjustAddress, setNewPosition }">
+             <div class="col-12 mb-3">
+               <x-card bordered>
+-                <google-maps
++                <geo-map
+                   :config="store.map.config"
+                   :lat="lat"
+                   :lng="lng"
+@@ -376,7 +373,7 @@
+                   tabindex="-1"
+                 >
+                   <template #default="{ map }">
+-                    <google-maps-markers
++                    <geo-markers
+                       :markers="
+                         markerOptionalSchools(
+                           getOptionalSchoolsFilter(
+@@ -388,7 +385,8 @@
+                           )
+                         )
+                       "
+-                      :map="(map as google.maps.Map)"
++                      :map="(map)"
++                      fit-bounds
+                       @click="selectSecondSchool"
+                     >
+                       <template #default="{ marker: markerSlot }">
+@@ -396,9 +394,10 @@
+                           <strong>{{ markerSlot.label }}</strong>
+                         </div>
+                       </template>
+-                    </google-maps-markers>
+-                    <google-maps-marker-component
+-                      :map="(map as google.maps.Map)"
++                    </geo-markers>
++                    <geo-marker-component
++                      v-if="hasAddressCoordinates"
++                      :map="(map)"
+                       :marker="marker"
+                     >
+                       <template #default>
+@@ -406,10 +405,10 @@
+                           <strong>{{ marker.title }}</strong>
+                         </div>
+                       </template>
+-                    </google-maps-marker-component>
+-                    <google-maps-marker-component
++                    </geo-marker-component>
++                    <geo-marker-component
+                       v-if="adjustAddress"
+-                      :map="(map as google.maps.Map)"
++                      :map="(map)"
+                       :marker="markerAdjustedAddress"
+                       draggable
+                       @new-position="setNewPosition"
+@@ -419,9 +418,9 @@
+                           <strong>Novo ponto de referência</strong>
+                         </div>
+                       </template>
+-                    </google-maps-marker-component>
++                    </geo-marker-component>
+                   </template>
+-                </google-maps>
++                </geo-map>
+               </x-card>
+             </div>
+           </template>
+@@ -438,13 +437,13 @@
+         </div>
+ 
+         <template
+-          v-for="(waiting, index) in modelStudent.waitingList"
++          v-for="(waiting, index) in (isWaitingList ? modelStudent.waitingList.slice(0, 1) : [])"
+           :key="index"
+         >
+           <div class="col-12 border-top pt-3 mt-3">
+             <div class="row">
+               <div class="col-12 mt-3 mb-3">
+-                Opção {{ index + 2 }}: lista de espera
++                Opção {{ index + (isWaitingList ? 2 : 3) }} de escola: lista de espera
+               </div>
+               <x-field
+                 v-model="modelStudent.grade"
+@@ -491,7 +490,7 @@
+               />
+               <div class="col-12 mb-3">
+                 <x-card bordered>
+-                  <google-maps
++                  <geo-map
+                     :config="store.map.config"
+                     :lat="lat"
+                     :lng="lng"
+@@ -500,7 +499,7 @@
+                     tabindex="-1"
+                   >
+                     <template #default="{ map }">
+-                      <google-maps-markers
++                      <geo-markers
+                         :markers="
+                           markerOptionalSchools(
+                             getOptionalSchoolsFilter(
+@@ -510,7 +509,7 @@
+                             )
+                           )
+                         "
+-                        :map="(map as google.maps.Map)"
++                        :map="(map)"
+                         @click="waiting.school = $event?.id"
+                       >
+                         <template #default="{ marker: markerSlot }">
+@@ -518,9 +517,9 @@
+                             <strong>{{ markerSlot.label }}</strong>
+                           </div>
+                         </template>
+-                      </google-maps-markers>
+-                      <google-maps-marker-component
+-                        :map="(map as google.maps.Map)"
++                      </geo-markers>
++                      <geo-marker-component
++                        :map="(map)"
+                         :marker="marker"
+                       >
+                         <template #default>
+@@ -528,9 +527,9 @@
+                             <strong>{{ marker.title }}</strong>
+                           </div>
+                         </template>
+-                      </google-maps-marker-component>
++                      </geo-marker-component>
+                     </template>
+-                  </google-maps>
++                  </geo-map>
+                 </x-card>
+                 <x-btn
+                   class="ml-auto border-danger text-danger flex-row mt-3"
+@@ -547,11 +546,11 @@
+         <div class="col-12">
+           <x-btn
+             v-if="
+-              modelStudent.waitingList.length + 1 < process.waitingListLimit
++              isWaitingList && modelStudent.waitingList.length === 0 && process.waitingListLimit > 1
+             "
+             class="w-100"
+             color="primary"
+-            label="Adicionar outra escola para aguardar na lista de espera"
++            label="Selecionar a 2ª opção de escola"
+             no-caps
+             no-wrap
+             @click="addWaitingList"
+@@ -576,7 +575,7 @@
+ import {
+   Address,
+   AddressPosition,
+-  GoogleMapsMarker,
++  GeoMarkerData,
+   Nullable,
+   Option,
+   Rules,
+@@ -597,12 +596,13 @@ import {
+   ref,
+   watch,
+ } from 'vue';
++import { hasConfirmedCoordinates } from '../addressTransition';
+ import { markerAddress, newLocationPosition } from '@/util';
+ import { Filters } from '@/filters';
+ import { GenericFields } from '@/components/form/Fields.vue';
+-import GoogleMaps from '@/components/maps/GoogleMaps.vue';
+-import GoogleMapsMarkerComponent from '@/components/maps/GoogleMapsMarker.vue';
+-import GoogleMapsMarkers from '@/components/maps/GoogleMapsMarkers.vue';
++import GeoMap from '@/components/maps/GeoMap.vue';
++import GeoMarkerComponent from '@/components/maps/GeoMarker.vue';
++import GeoMarkers from '@/components/maps/GeoMarkers.vue';
+ import NoSuggestedGradesMessage from '@/modules/preregistration/components/NoSuggestedGradesMessage.vue';
+ import SelectAddressPosition from '@/components/elements/SelectAddressPosition.vue';
+ import SuggestedGradesMessageComponent from '@/modules/preregistration/components/SuggestedGradesMessage.vue';
+@@ -610,7 +610,7 @@ import XBtn from '@/components/elements/buttons/XBtn.vue';
+ import XCard from '@/components/elements/cards/XCard.vue';
+ import XCardSection from '@/components/elements/cards/XCardSection.vue';
+ import XField from '@/components/x-form/XField.vue';
+-import { isPointWithinRadius } from 'geolib';
++import { isPointWithinRadius, getDistance } from 'geolib';
+ import { isValidDate } from '@/datetime';
+ import { useGeneralStore } from '@/store/general';
+ import { useStudentProcessAndSuggestGrades } from '@/composables';
+@@ -638,9 +638,9 @@ export default defineComponent({
+     XBtn,
+     XCard,
+     XCardSection,
+-    GoogleMaps,
+-    GoogleMapsMarkerComponent,
+-    GoogleMapsMarkers,
++    GeoMap,
++    GeoMarkerComponent,
++    GeoMarkers,
+     SelectAddressPosition,
+     SuggestedGradesMessageComponent,
+     NoSuggestedGradesMessage,
+@@ -778,6 +778,8 @@ export default defineComponent({
+       return !doesntHaveSchoolsWithVacancies.value;
+     });
+ 
++    const hasAddressCoordinates = computed(() => hasConfirmedCoordinates(selectedAddress.value));
++
+     const lat = computed(() => {
+       return selectedAddress.value.lat || store.map.center.lat;
+     });
+@@ -854,6 +856,11 @@ export default defineComponent({
+       return allSchools
+         .filter((s) => s.lat && s.lng)
+         .filter((schoolOption) => {
++          if (!isWaitingList.value && String(schoolOption.id) !== String(school)) {
++            const selected = [modelStudent.value.school, modelStudent.value.secondSchool,
++              ...modelStudent.value.waitingList.map(w => w.school)];
++            if (selected.some(id => id && String(id) === String(schoolOption.id))) return false;
++          }
+           const vacancies = process.value?.vacancies.filter(
+             (v) => Number(v.school) === Number(schoolOption.id)
+           );
+@@ -887,25 +894,21 @@ export default defineComponent({
+     // Exibe apenas as escolas próximas ao endereço, quando o raio está configurado, caso não haja nenhuma escola
+     // disponível, irá exibir todas as escolas que tenham turmas que possuam vagas na série e turno selecionados.
+     // Utilizado para a listagem das escolas da escolha principal.
++    const sortByDistance = (schools: School[]) => [...schools].sort((a, b) => {
++      if (!hasAddressCoordinates.value) return [...schools];
++      const origin = {latitude: Number(selectedAddress.value.lat), longitude: Number(selectedAddress.value.lng)};
++      return getDistance(origin, {latitude: a.lat, longitude: a.lng}) - getDistance(origin, {latitude: b.lat, longitude: b.lng});
++    });
+     const closestSchools = computed(() => {
+-      const filtered = filteredSchools.value;
+-
+-      if (
+-        modelStudent.value.grade &&
+-        modelStudent.value.period &&
+-        filtered.length === 0
+-      ) {
+-        return modelStage.value?.renewalAtSameSchool
+-          ? []
+-          : schoolsWithVacancy.value;
+-      }
+-
+-      return filtered;
++      const available = schoolsWithVacancy.value as School[];
++      return sortByDistance(renewalAtSameSchool.value
++        ? available.filter(school => isMatchedSchool(school.id))
++        : available);
+     });
+ 
+-    const markerClosestSchools = computed<GoogleMapsMarker[]>(
+-      (): GoogleMapsMarker[] =>
+-        closestSchools.value as unknown as GoogleMapsMarker[]
++    const markerClosestSchools = computed<GeoMarkerData[]>(
++      (): GeoMarkerData[] =>
++        closestSchools.value.map(s => ({...s, color: 'blue', permanentLabel: s.name || s.label})) as GeoMarkerData[]
+     );
+ 
+     const schoolsWithinRange = computed<School[]>(() => {
+@@ -966,7 +969,7 @@ export default defineComponent({
+       return filteredSchools || [];
+     });
+ 
+-    const marker = computed<GoogleMapsMarker>(
++    const marker = computed<GeoMarkerData>(
+       () =>
+         ({
+           ...markerAddress(),
+@@ -974,20 +977,21 @@ export default defineComponent({
+             lat: selectedAddress.value.lat,
+             lng: selectedAddress.value.lng,
+           },
+-        } as unknown as GoogleMapsMarker)
++        } as unknown as GeoMarkerData)
+     );
+ 
+-    const markerOptionalSchools = (schools: School[]): GoogleMapsMarker[] =>
++    const markerOptionalSchools = (schools: School[]): GeoMarkerData[] =>
+       schools.map((s) => ({
+         label: s.label,
++        color: 'blue', permanentLabel: s.name || s.label,
+         position: {
+           lat: s.lat,
+           lng: s.lng,
+         },
+         id: s.id,
+-      })) as unknown as GoogleMapsMarker[];
++      })) as unknown as GeoMarkerData[];
+ 
+-    const markerAdjustedAddress = computed<GoogleMapsMarker>(
++    const markerAdjustedAddress = computed<GeoMarkerData>(
+       () =>
+         ({
+           ...markerAddress(),
+@@ -995,7 +999,7 @@ export default defineComponent({
+             lat: selectedAddress.value.lat,
+             lng: selectedAddress.value.lng,
+           },
+-        } as unknown as GoogleMapsMarker)
++        } as unknown as GeoMarkerData)
+     );
+ 
+     const clearSchools = () => {
+@@ -1082,6 +1086,7 @@ export default defineComponent({
+       }
+ 
+       return (
++        !hasAddressCoordinates.value ||
+         (modelStage.value as PreRegistrationStage).radius <= 0 ||
+         isPointWithinRadius(
+           {
+@@ -1169,6 +1174,7 @@ export default defineComponent({
+     };
+ 
+     const addWaitingList = () => {
++      if (!isWaitingList.value || modelStudent.value.waitingList.length >= 1) return;
+       modelStudent.value?.waitingList.push({
+         period: '',
+         school: '',
+@@ -1275,6 +1281,7 @@ export default defineComponent({
+       allSchools,
+       closestSchools,
+       markerClosestSchools,
++      hasAddressCoordinates,
+       schoolsWithinRange,
+       schoolsForWaitingList,
+       schoolsWithVacancy,
+diff --git a/resources/ts/modules/preregistration/types.ts b/resources/ts/modules/preregistration/types.ts
+index f98e954..a74d3d4 100644
+--- a/resources/ts/modules/preregistration/types.ts
++++ b/resources/ts/modules/preregistration/types.ts
+@@ -1,3 +1,16 @@
++export interface DocumentarySummary {
++  released: boolean;
++  label: string;
++  mode: string | null;
++  deadline: string | null;
++  required: number;
++  received: number;
++  approved: number;
++  corrections: number;
++  enrolled: boolean;
++  triageUrl: string | null;
++}
++
+ import {
+   Address,
+   ErrorResponse,
+@@ -322,6 +335,7 @@ export interface PreRegistrationResponsible {
+ }
+ 
+ export interface PreRegistration {
++  documentarySummary?: DocumentarySummary | null;
+   id: number;
+   date: string;
+   protocol: string;
+diff --git a/resources/ts/modules/protocol/api/services/graphql/protocol.ts b/resources/ts/modules/protocol/api/services/graphql/protocol.ts
+index 4c5670b..8ba36a4 100644
+--- a/resources/ts/modules/protocol/api/services/graphql/protocol.ts
++++ b/resources/ts/modules/protocol/api/services/graphql/protocol.ts
+@@ -16,6 +16,8 @@ export const show = (data: {
+           id
+           type
+           status
++          documentationStatus
++          documentationDeadline
+           position
+           student {
+             initials
+diff --git a/resources/ts/modules/protocol/components/ProtocolStatus.vue b/resources/ts/modules/protocol/components/ProtocolStatus.vue
+index f53bbf7..3a87f58 100644
+--- a/resources/ts/modules/protocol/components/ProtocolStatus.vue
++++ b/resources/ts/modules/protocol/components/ProtocolStatus.vue
+@@ -23,14 +23,15 @@
+         <div class="m-auto pt-4">
+           <div class="protocol card p-3 m-auto">
+             <div v-if="preregistration">
++              <registration-stages :status="preregistration.status" :documentation-status="preregistration.documentationStatus" />
+               <div v-if="preregistration.status === 'ACCEPTED'">
+                 <div class="alert badge-green text-center text-uppercase">
+-                  Deferido
++                  Matrícula efetivada
+                 </div>
+               </div>
+               <div v-if="preregistration.status === 'WAITING'">
+                 <div class="alert badge-yellow text-center text-uppercase">
+-                  Em espera
++                  Pré-matrícula em análise
+                 </div>
+               </div>
+               <div v-if="preregistration.status === 'REJECTED'">
+@@ -40,16 +41,26 @@
+               </div>
+               <div v-if="preregistration.status === 'SUMMONED'">
+                 <div class="alert badge-purple text-center text-uppercase">
+-                  Responsáveis Convocados
++                  {{ preregistration.documentationStatus === 'AWAITING_REVIEW' || preregistration.documentationStatus === 'UNDER_REVIEW' ? 'Documentação em análise' : 'Aguardando documentação' }}
+                 </div>
+               </div>
+               <div v-if="preregistration.status === 'IN_CONFIRMATION'">
+                 <div
+                   class="alert badge-light-orange text-center text-uppercase"
+                 >
+-                  Em confirmação
++                  {{ preregistration.documentationStatus === 'APPROVED' ? 'Documentação aprovada — aguardando efetivação' : 'Documentação em análise' }}
+                 </div>
+               </div>
++              <div v-if="['SUMMONED', 'IN_CONFIRMATION'].includes(preregistration.status)" class="alert alert-info">
++                <template v-if="preregistration.documentationStatus === 'APPROVED'">
++                  <strong>Documentação aprovada.</strong> Aguardando efetivação da matrícula pela unidade escolar.
++                </template>
++                <template v-else>
++                  <strong>Sua pré-matrícula foi deferida.</strong> Acesse o acompanhamento para escolher como entregar os documentos. A matrícula será efetivada pela escola após a aprovação documental.
++                  <p v-if="preregistration.documentationDeadline">Prazo para envio online ou entrega presencial: <strong>{{ new Date(preregistration.documentationDeadline).toLocaleString('pt-BR') }}</strong>.</p>
++                </template>
++                <p class="mt-3"><a href="/matricula-digital" class="btn btn-primary">Acompanhar documentação e matrícula</a></p>
++              </div>
+               <dl class="mb-0">
+                 <dt>Aluno(a)</dt>
+                 <dd>
+@@ -243,6 +254,7 @@ import { Protocol } from '@/modules/protocol/api';
+ import ProtocolConfirmKeepInWaitingList from '@/modules/protocol/components/ProtocolConfirmKeepInWaitingList.vue';
+ import ProtocolConsult from '@/components/elements/ProtocolConsult.vue';
+ import ProtocolStatusModal from './ProtocolStatusModal.vue';
++import RegistrationStages from './RegistrationStages.vue';
+ import { ProtocolStatusPreRegistration } from '@/modules/protocol/types';
+ import XBtn from '@/components/elements/buttons/XBtn.vue';
+ import { useGeneralStore } from '@/store/general';
+diff --git a/resources/ts/modules/protocol/types.ts b/resources/ts/modules/protocol/types.ts
+index 7c7e457..5b58ee4 100644
+--- a/resources/ts/modules/protocol/types.ts
++++ b/resources/ts/modules/protocol/types.ts
+@@ -20,6 +20,8 @@ export interface FindProtocolPreRegistration {
+ }
+ 
+ export interface ProtocolStatusPreRegistration {
++  documentationStatus?: Nullable<string>;
++  documentationDeadline?: Nullable<string>;
+   classroom: {
+     grade: {
+       name: string;
+diff --git a/resources/ts/modules/school/components/SchoolFind.vue b/resources/ts/modules/school/components/SchoolFind.vue
+index 197449b..f00b592 100644
+--- a/resources/ts/modules/school/components/SchoolFind.vue
++++ b/resources/ts/modules/school/components/SchoolFind.vue
+@@ -54,7 +54,7 @@
+     <div class="row">
+       <div class="col-12 mt-5">
+         <div class="card">
+-          <google-maps
++          <geo-map
+             :config="getMapConfig"
+             :lat="lat"
+             :lng="lng"
+@@ -62,18 +62,19 @@
+             style="height: 400px"
+           >
+             <template #default="{ map }">
+-              <google-maps-marker-component
++              <geo-marker-component
+                 v-if="marker.position"
+-                :map="(map as google.maps.Map)"
++                :map="(map)"
+                 :marker="marker"
+               >
+                 <template #default>
+                   <strong>{{ marker.title }}</strong>
+                 </template>
+-              </google-maps-marker-component>
+-              <google-maps-markers
++              </geo-marker-component>
++              <geo-markers
+                 :markers="schoolsInMap"
+-                :map="(map as google.maps.Map)"
++                fit-bounds
++                :map="(map)"
+               >
+                 <template #default="{ marker: markerSlot }">
+                   <div>
+@@ -85,9 +86,9 @@
+                     </div>
+                   </div>
+                 </template>
+-              </google-maps-markers>
++              </geo-markers>
+             </template>
+-          </google-maps>
++          </geo-map>
+         </div>
+       </div>
+     </div>
+@@ -95,6 +96,7 @@
+ </template>
+ 
+ <script setup lang="ts">
++import { geocode } from '@/services/geocoding';
+ import {
+   GradeFiltered,
+   Processes,
+@@ -103,10 +105,10 @@ import {
+   Vacancies,
+ } from '@/modules/school/types';
+ import { computed, onMounted, ref } from 'vue';
+-import GoogleMaps from '@/components/maps/GoogleMaps.vue';
+-import { GoogleMapsMarker } from '@/types';
+-import GoogleMapsMarkerComponent from '@/components/maps/GoogleMapsMarker.vue';
+-import GoogleMapsMarkers from '@/components/maps/GoogleMapsMarkers.vue';
++import GeoMap from '@/components/maps/GeoMap.vue';
++import { GeoMarkerData } from '@/types';
++import GeoMarkerComponent from '@/components/maps/GeoMarker.vue';
++import GeoMarkers from '@/components/maps/GeoMarkers.vue';
+ import HeaderEntityData from '@/components/elements/HeaderEntityData.vue';
+ import { Schoolfind as SchoolFind } from '@/modules/school/api';
+ import XBtn from '@/components/elements/buttons/XBtn.vue';
+@@ -129,10 +131,10 @@ const lng = ref<number | undefined>(store.map.center.lng);
+ const zoom = ref(store.map.zoom);
+ const loadingSearchAddress = ref<boolean | undefined>(false);
+ const address = ref(null);
+-const marker = ref<GoogleMapsMarker>(markerAddress());
++const marker = ref<GeoMarkerData>(markerAddress());
+ 
+ const grade = ref<string>();
+-const geocoder = ref<google.maps.Geocoder>();
++// Coordinates are independent from the map provider.
+ 
+ const grades = computed(() => {
+   const grades: GradeFiltered[] = [];
+@@ -157,7 +159,7 @@ const grades = computed(() => {
+   );
+ });
+ 
+-const schoolsInMap = computed<GoogleMapsMarker[]>(() =>
++const schoolsInMap = computed<GeoMarkerData[]>(() =>
+   schools.value
+     .filter((school) => school.id)
+     .filter((school) => {
+@@ -175,7 +177,7 @@ const schoolsInMap = computed<GoogleMapsMarker[]>(() =>
+     .map((school) => ({
+       ...school,
+       title: school.name,
+-      position: new google.maps.LatLng(school.lat, school.lng),
++      position: { lat: Number(school.lat), lng: Number(school.lng) },
+     }))
+ );
+ 
+@@ -191,36 +193,17 @@ const getData = () => {
+ };
+ getData();
+ 
+-const searchAddress: () => void = () => {
+-  if (!address.value) {
+-    return;
+-  }
+-  const filteredAddress = [address.value, store.entity.city, store.entity.state]
+-    .filter((i) => i)
+-    .join(', ');
++const searchAddress = async () => {
++  if (!address.value) return;
+   loadingSearchAddress.value = true;
+-  geocoder.value
+-    ?.geocode(
+-      { address: filteredAddress },
+-      (
+-        results: google.maps.GeocoderResult[] | null,
+-        status: google.maps.GeocoderStatus
+-      ) => {
+-        if (status === 'OK' && results) {
+-          lat.value = results[0].geometry.location.lat();
+-          lng.value = results[0].geometry.location.lng();
+-          marker.value.position = results[0].geometry.location;
+-        }
+-      }
+-    )
+-    .finally(() => {
+-      loadingSearchAddress.value = false;
+-    });
++  try {
++    const result = await geocode([address.value, store.entity.city, store.entity.state].filter(Boolean).join(', '));
++    lat.value = result.latitude;
++    lng.value = result.longitude;
++    marker.value.position = {lat: result.latitude, lng: result.longitude} as any;
++  } catch { window.alert('Busca indisponível. Utilize a lista de escolas.'); }
++  finally { loadingSearchAddress.value = false; }
+ };
+-
+-onMounted(() => {
+-  geocoder.value = new google.maps.Geocoder();
+-});
+ </script>
+ 
+ <style>
+diff --git a/resources/ts/types/types.ts b/resources/ts/types/types.ts
+index fb58d7b..e32324e 100644
+--- a/resources/ts/types/types.ts
++++ b/resources/ts/types/types.ts
+@@ -227,15 +227,17 @@ export interface PaginatorInfo {
+   total: number;
+ }
+ 
+-export interface GoogleMapsMarker {
++export interface GeoMarkerData {
++  color?: 'blue';
++  permanentLabel?: string;
+   id: string | number;
+   title: string;
+   name?: string;
+   label?: string;
+   phone?: string;
+   area_code?: number;
+-  position: Nullable<google.maps.LatLng>;
+-  marker?: google.maps.Marker;
++  position: Nullable<{ lat: number; lng: number }>;
++  marker?: unknown;
+   config?: Record<string, unknown>;
+ }
+ export interface ErrorResponse {
+diff --git a/resources/ts/util.ts b/resources/ts/util.ts
+index ca58d0c..1330033 100644
+--- a/resources/ts/util.ts
++++ b/resources/ts/util.ts
+@@ -1,7 +1,7 @@
+ import {
+   Address,
+   AddressPosition,
+-  GoogleMapsMarker,
++  GeoMarkerData,
+   Nullable,
+   Option,
+   Rules,
+@@ -29,7 +29,7 @@ type ProcessTypes =
+ export interface MarkerAddress {
+   id: number;
+   title: string;
+-  position: Nullable<google.maps.LatLng>;
++  position: Nullable<{ lat: number; lng: number }>;
+   config: {
+     icon: {
+       path: string;
+@@ -93,7 +93,7 @@ const reportsTemplates = () => [
+   { key: 4, label: 'Quantitativo' },
+ ];
+ 
+-const markerAddress = (): GoogleMapsMarker => ({
++const markerAddress = (): GeoMarkerData => ({
+   id: 1,
+   title: 'Seu endereço',
+   position: null,
+@@ -116,8 +116,8 @@ const newAddress = (): Address => ({
+   number: '',
+   complement: '',
+   neighborhood: '',
+-  lat: 0,
+-  lng: 0,
++  lat: undefined,
++  lng: undefined,
+   city: '',
+   cityIbgeCode: 0,
+   stateAbbreviation: '',
+@@ -323,17 +323,28 @@ const parseFieldsFromProcess = <T>(
+   };
+ };
+ 
+-const parseResponsibleFieldsFromProcess = (process: ProcessTypes) =>
+-  parseFieldsFromProcess<PreRegistrationResponsibleField>(
++const parseResponsibleFieldsFromProcess = (process: ProcessTypes) => {
++  const result = parseFieldsFromProcess<PreRegistrationResponsibleField>(
+     process,
+-    {
+-      relationType: null,
+-      address: newAddress(),
+-      useSecondAddress: false,
+-      secondAddress: newAddress(),
+-    } as PreRegistrationResponsibleField,
++    { relationType: null, address: newAddress(), useSecondAddress: false,
++      secondAddress: newAddress(), responsible_email: null } as PreRegistrationResponsibleField,
+     'RESPONSIBLE'
+   );
++  const email = result.fields.find(field => field.key === 'responsible_email');
++  if (email) {
++    email.rules = { required: true, email: true };
++    email.type = 'EMAIL';
++  } else {
++    result.fields.push({
++      id: 'responsible_email', key: 'responsible_email', order: 999,
++      field: { id: 'responsible_email', internal: 'responsible_email', name: 'E-mail do responsável',
++        description: 'Usado para receber o protocolo e acompanhar a inscrição.', type: 'EMAIL', group: 'RESPONSIBLE', options: [] },
++      rules: { required: true, email: true }, classes: { 'col-12 col-md-6': true },
++      type: 'EMAIL', label: 'E-mail do responsável', filter: (value: string) => value,
++    } as ParseFieldFromProcess);
++  }
++  return result;
++};
+ 
+ const parseStudentFieldsFromProcess = (process: ProcessTypes) =>
+   parseFieldsFromProcess<PreRegistrationStudentField>(
+@@ -386,7 +397,7 @@ const preRegistrationStatusText = (status: string): string => {
+     case 'ACCEPTED':
+       return 'Deferido';
+     case 'SUMMONED':
+-      return 'Em convocação';
++      return 'Aguardando documentação';
+     case 'IN_CONFIRMATION':
+       return 'Em confirmação';
+     case 'WAITING':
+diff --git a/src/GraphQL/Mutations/NewPreRegistration.php b/src/GraphQL/Mutations/NewPreRegistration.php
+index 3322e91..a21320e 100644
+--- a/src/GraphQL/Mutations/NewPreRegistration.php
++++ b/src/GraphQL/Mutations/NewPreRegistration.php
+@@ -39,7 +39,12 @@ class NewPreRegistration
+         $process = $stage->process;
+ 
+         $this->validateIfProcessStageIsOpen($stage);
++        $this->validateSchoolAlternatives($args, $stage);
+         $this->validateIfDoesNotHaveAnotherPreRegistration($args, $process);
++        $email = collect($args['responsible'])->firstWhere('field', 'responsible_email')['value'] ?? null;
++        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
++            throw new PreRegistrationValidationException('Informe um e-mail válido do responsável para receber o protocolo e acompanhar a inscrição.');
++        }
+ 
+         $student = $this->createPerson($args['student'], 'student', $args['address']);
+         $responsible = $this->createPerson($args['responsible'], 'responsible', $args['address']);
+@@ -57,7 +62,7 @@ class NewPreRegistration
+             $preregistrations[] = $preregistration;
+         }
+ 
+-        if ($args['optionalSchool']) {
++        if (($args['optionalSchool'] ?? null)) {
+             $args['school_id'] = $args['optionalSchool'];
+             $args['period_id'] = $args['optionalPeriod'];
+             $args['preregistration_type_id'] = PreRegistration::WAITING_LIST;
+@@ -97,6 +102,36 @@ class NewPreRegistration
+         return $preregistrations;
+     }
+ 
++    private function validateSchoolAlternatives(array $args, ProcessStage $stage): void
++    {
++        $alternatives = $args['waitingList'] ?? [];
++        if (!empty($args['optionalSchool'])) {
++            array_unshift($alternatives, ['school_id' => $args['optionalSchool'], 'period_id' => $args['optionalPeriod'] ?? $args['period_id']]);
++        }
++        if (!$alternatives) {
++            return;
++        }
++        if (!$stage->allow_waiting_list && $args['preregistration_type_id'] !== PreRegistration::WAITING_LIST) {
++            throw new PreRegistrationValidationException('Este período não permite escolas alternativas.');
++        }
++        $schools = isset($args['school_id']) ? [(string) $args['school_id']] : [];
++        if (count($alternatives) + (isset($args['school_id']) ? 1 : 0) > 2) {
++            throw new PreRegistrationValidationException('Escolha no máximo duas escolas: a principal e uma alternativa.');
++        }
++        foreach ($alternatives as $alternative) {
++            $school = (string) $alternative['school_id'];
++            if ($args['preregistration_type_id'] !== PreRegistration::WAITING_LIST && in_array($school, $schools, true)) {
++                throw new PreRegistrationValidationException('Escolha escolas diferentes para cada opção.');
++            }
++            $schools[] = $school;
++            if (!ProcessVacancy::query()->where('process_id', $args['process_id'])
++                ->where('school_id', $school)->where('grade_id', $args['grade_id'])
++                ->where('period_id', $alternative['period_id'])->exists()) {
++                throw new PreRegistrationValidationException('Escola alternativa incompatível com o processo, série ou turno.');
++            }
++        }
++    }
++
+     private function createPerson($fields, $prefix, $address): Person
+     {
+         $personData = $this->parseAttributesFromFields($fields, $prefix);
+@@ -249,7 +284,7 @@ class NewPreRegistration
+ 
+         $waitingListLimit = $process->waiting_list_limit;
+         $waitingListLimitInGrouper = $process->grouper?->waiting_list_limit ?? INF; // Infinito, se não definido
+-        $waitingListBeDoing = count($payload['waitingList'] ?? []);
++        $waitingListBeDoing = count($payload['waitingList'] ?? []) + (!empty($payload['optionalSchool']) ? 1 : 0);
+         $waitingListBeDoing = $waitingList ? 1 + $waitingListBeDoing : $waitingListBeDoing;
+         $waitingListTotal = $count + $waitingListBeDoing;
+ 
+diff --git a/src/Http/Controllers/ConfigController.php b/src/Http/Controllers/ConfigController.php
+index 98eb4ea..adc85ab 100644
+--- a/src/Http/Controllers/ConfigController.php
++++ b/src/Http/Controllers/ConfigController.php
+@@ -17,6 +17,7 @@ class ConfigController
+     public function config()
+     {
+         $config = [
++            'tiles' => \App\Geo\MapConfig::publicConfig(),
+             'city' => config('prematricula.city'),
+             'state' => config('prematricula.state'),
+             'ibge_codes' => config('prematricula.ibge_codes'),
+@@ -31,7 +32,7 @@ class ConfigController
+             'allow_optional_address' => config('prematricula.allow_optional_address'),
+             'show_how_to_do_video' => config('prematricula.show_how_to_do_video'),
+             'video_intro_url' => config('prematricula.video_intro_url'),
+-            'link_to_restrict_area' => config('prematricula.link_to_restrict_area'),
++            'link_to_restrict_area' => config('prematricula.link_to_restrict_area') ?: '/matricula-digital',
+             'features' => config('prematricula.features'),
+         ];
+ 
+diff --git a/src/Services/EnrollmentService.php b/src/Services/EnrollmentService.php
+index 6f19395..167a7b7 100644
+--- a/src/Services/EnrollmentService.php
++++ b/src/Services/EnrollmentService.php
+@@ -14,6 +14,7 @@ use App\Models\LegacyGrade;
+ use App\Models\LegacyRegistration;
+ use App\Models\LegacySchoolClass;
+ use App\Models\LegacyStudent;
++use App\Models\RegistrationStatus;
+ use App_Model_MatriculaSituacao;
+ use Carbon\Carbon;
+ use Exception;
+@@ -76,6 +77,11 @@ class EnrollmentService
+         return $registration;
+     }
+ 
++    public function preRegister(LegacyStudent $student, PreRegistration $preregistration, Carbon $date): LegacyRegistration
++    {
++        return $this->createRegistration($student, $preregistration, $date, RegistrationStatus::PRE_REGISTRATION);
++    }
++
+     private function transferEnabled()
+     {
+         return config('prematricula.features.allow_transfer_registration');
+@@ -105,6 +111,7 @@ class EnrollmentService
+         LegacyStudent $student,
+         PreRegistration $preregistration,
+         Carbon $date,
++        int $status = App_Model_MatriculaSituacao::EM_ANDAMENTO,
+     ) {
+         return LegacyRegistration::create(
+             [
+@@ -113,7 +120,7 @@ class EnrollmentService
+                 'ano' => $preregistration->process->school_year_id,
+                 'ref_usuario_cad' => 1, // todo: pegar usuário logado?
+                 'ativo' => 1,
+-                'aprovado' => App_Model_MatriculaSituacao::EM_ANDAMENTO,
++                'aprovado' => $status,
+                 'ref_cod_curso' => $preregistration->grade->course_id,
+                 'ref_ref_cod_escola' => $preregistration->school_id,
+                 'data_matricula' => $date,
+diff --git a/tsconfig.json b/tsconfig.json
+index 51496cd..397a453 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -17,7 +17,7 @@
+     "sourceMap": true,
+     "baseUrl": ".",
+     "lib": ["esnext", "dom", "dom.iterable", "scripthost"],
+-    "types": ["vite/client", "node", "google.maps"],
++    "types": ["vite/client", "node"],
+     "paths": {
+       "@/*": ["resources/ts/*"]
+     }
+diff --git a/vite.config.ts b/vite.config.ts
+index 0cb2b6a..9b16dd5 100644
+--- a/vite.config.ts
++++ b/vite.config.ts
+@@ -44,7 +44,6 @@ export default (config) => {
+         entry: '/resources/ts/main.ts',
+         inject: {
+           data: {
+-            GOOGLE_API_KEY: env.VITE_GOOGLE_API_KEY,
+           },
+         },
+       }),
+diff --git a/yarn.lock b/yarn.lock
+index cfaa6bc..7ca96ff 100644
+--- a/yarn.lock
++++ b/yarn.lock
+@@ -510,10 +510,10 @@
+   dependencies:
+     "@types/node" "*"
+ 
+-"@types/google.maps@^3.48.6":
+-  version "3.58.1"
+-  resolved "https://registry.yarnpkg.com/@types/google.maps/-/google.maps-3.58.1.tgz#71ce3dec44de1452f56641d2c87c7dd8ea964b4d"
+-  integrity sha512-X9QTSvGJ0nCfMzYOnaVs/k6/4L+7F5uCS+4iUmkLEls6J9S/Phv+m/i3mDeyc49ZBgwab3EFO1HEoBY7k98EGQ==
++"@types/geojson@*":
++  version "7946.0.16"
++  resolved "https://registry.yarnpkg.com/@types/geojson/-/geojson-7946.0.16.tgz#8ebe53d69efada7044454e3305c19017d97ced2a"
++  integrity sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==
+ 
+ "@types/http-errors@*":
+   version "2.0.5"
+@@ -530,6 +530,13 @@
+   resolved "https://registry.yarnpkg.com/@types/json-schema/-/json-schema-7.0.15.tgz#596a1747233694d50f6ad8a7869fcb6f56cf5841"
+   integrity sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==
+ 
++"@types/leaflet@^1.9.22":
++  version "1.9.22"
++  resolved "https://registry.yarnpkg.com/@types/leaflet/-/leaflet-1.9.22.tgz#d46d501e5bcdf5a99374cf113ab33562cb887783"
++  integrity sha512-h3lhECYEKDasG7LFHu+GiHqAvsgLuQvlJvVZzJDGONo3sEL+wUOqSFLnwkZlK0qVxnxbuGFW8iBlJNYs5wgndA==
++  dependencies:
++    "@types/geojson" "*"
++
+ "@types/mime@^1":
+   version "1.3.5"
+   resolved "https://registry.yarnpkg.com/@types/mime/-/mime-1.3.5.tgz#1ef302e01cf7d2b5a0fa526790c9123bf1d06690"
+@@ -2539,6 +2546,11 @@ klona@^2.0.4:
+   resolved "https://registry.yarnpkg.com/klona/-/klona-2.0.6.tgz#85bffbf819c03b2f53270412420a4555ef882e22"
+   integrity sha512-dhG34DXATL5hSxJbIexCft8FChFXtmskoZYnoPWjXQuebWYCNkVeV3KkGegCK9CP1oswI/vQibS2GY7Em/sJJA==
+ 
++leaflet@1.9.4:
++  version "1.9.4"
++  resolved "https://registry.yarnpkg.com/leaflet/-/leaflet-1.9.4.tgz#23fae724e282fa25745aff82ca4d394748db7d8d"
++  integrity sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==
++
+ levn@^0.4.1:
+   version "0.4.1"
+   resolved "https://registry.yarnpkg.com/levn/-/levn-0.4.1.tgz#ae4562c007473b932a6200d403268dd2fffc6ade"

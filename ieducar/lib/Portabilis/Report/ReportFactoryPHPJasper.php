@@ -42,6 +42,10 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
             throw new Exception('No report.logo_file_name defined in configurations!');
         }
 
+        if ($logo === 'brasao-balneario-camboriu.png') {
+            return public_path('img/brasao-balneario-camboriu.png');
+        }
+
         if (filter_var($logo, FILTER_VALIDATE_URL)) {
             $tmpFile = sys_get_temp_dir() . '/logo_' . hash('sha256', $logo) . '.png';
 

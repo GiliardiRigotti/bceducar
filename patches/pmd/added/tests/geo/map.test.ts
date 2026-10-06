@@ -1,0 +1,20 @@
+import {it, expect, vi} from 'vitest';
+import {mount} from '@vue/test-utils';
+import L from 'leaflet';
+import GeoMap from '@/components/maps/GeoMap.vue';
+it('uses central tiles, preserves the slot when tiles fail, and releases the map', async () => {
+  const mapStub = {setView:vi.fn(),panTo:vi.fn(),remove:vi.fn()}; mapStub.setView.mockReturnValue(mapStub);
+  const tilesStub = {on:vi.fn(),addTo:vi.fn()}; tilesStub.on.mockReturnValue(tilesStub); tilesStub.addTo.mockReturnValue(tilesStub);
+  (L.map as any).mockReturnValue(mapStub); (L.tileLayer as any).mockReturnValue(tilesStub);
+  (window as any).config = {tiles:{tileUrl:'https://tiles.test/{z}/{x}/{y}',attribution:'Test attribution',maxZoom:19}};
+  const wrapper = mount(GeoMap, {props:{lat:-26.99,lng:-48.63,zoom:14},slots:{default:'<span>School list</span>'}});
+  await wrapper.vm.$nextTick();
+  expect(L.tileLayer).toHaveBeenCalledWith('https://tiles.test/{z}/{x}/{y}', {attribution:'Test attribution',maxZoom:19});
+  const tiles = (L.tileLayer as any).mock.results[0].value;
+  tiles.on.mock.calls[0][1]();
+  await wrapper.vm.$nextTick();
+  expect(wrapper.text()).toContain('School list');
+  expect(wrapper.text()).toContain('Mapa temporariamente');
+  const map = (L.map as any).mock.results[0].value;
+  wrapper.unmount(); expect(map.remove).toHaveBeenCalled();
+});

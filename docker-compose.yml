@@ -10,6 +10,7 @@ x-php: &php
   working_dir: /var/www/ieducar
   volumes:
     - ./:/var/www/ieducar
+    - ./docker/php/uploads.ini:/usr/local/etc/php/conf.d/zz-uploads.ini:ro
   links:
     - postgres
     - redis
@@ -41,7 +42,13 @@ services:
   horizon:
     <<: *php
     container_name: ieducar-horizon
-    command: /var/www/ieducar/artisan horizon
+    command: php /var/www/ieducar/artisan horizon
+    restart: always
+
+  bc-deadlines:
+    <<: *php
+    container_name: ieducar-bc-deadlines
+    command: sh -c 'while true; do php artisan bc:expire-registration-requests; php artisan bc:queue-deadline-reminders; php artisan bc:monitor-physical-deadlines; php artisan bc:send-guardian-notices; php artisan bc:send-guardian-messages; sleep 300; done'
     restart: always
 
   nginx:
