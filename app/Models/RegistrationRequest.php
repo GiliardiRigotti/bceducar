@@ -52,7 +52,13 @@ class RegistrationRequest extends Model
     public function documentationLabel(): string
     {
         if ($this->workflow_version === 2 && in_array($this->status, [RequestStatus::Approved, RequestStatus::VacancyConfirmed])) {
-            return $this->integration_status === 'INTEGRATED' ? 'Matrícula em confirmação — aguardando conferência física' : 'Documentação aprovada — integração pendente';
+            if ($this->integration_status === 'INTEGRATED' && !LegacyEnrollment::query()
+                ->where('ref_cod_matricula', $this->intermediate_registration_id)
+                ->where('ref_cod_turma', $this->school_class_id)->where('ativo', 1)->exists()) {
+                return 'Matrícula intermediária — enturmação pendente';
+            }
+
+            return $this->integration_status === 'INTEGRATED' ? 'Vaga reservada — aguardando conferência física' : 'Documentação aprovada — integração pendente';
         }
 
         return match ($this->status) {

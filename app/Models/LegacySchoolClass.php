@@ -479,6 +479,7 @@ class LegacySchoolClass extends Model
                         1,
                         2,
                         3,
+                        RegistrationStatus::PRE_REGISTRATION,
                     ]);
                     $query->with('student.person');
                 },

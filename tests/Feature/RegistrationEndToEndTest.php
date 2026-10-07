@@ -165,7 +165,7 @@ class RegistrationEndToEndTest extends TestCase
         $this->assertSame(2, $application->workflow_version);
         $this->assertNull($application->registration_id);
         $this->assertSame(11, DB::table('pmieducar.matricula')->where('cod_matricula', $application->intermediate_registration_id)->value('aprovado'));
-        $this->assertFalse(DB::table('pmieducar.matricula_turma')->where('ref_cod_matricula', $application->intermediate_registration_id)->exists());
+        $this->assertTrue(DB::table('pmieducar.matricula_turma')->where('ref_cod_matricula', $application->intermediate_registration_id)->exists());
         $physical = app(PhysicalConfirmation::class);
         $physical->review($application, $actor, 'document:' . $document->id, true, null);
         $physical->review($application, $actor, 'cadastro', true, null);

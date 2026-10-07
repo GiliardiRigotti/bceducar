@@ -1,6 +1,8 @@
 <?php
 
+use App\EnrollmentRequests\NativePhysicalGuard;
 use App\Models\LegacyIndividual;
+use App\Models\LegacyRegistration;
 use iEducar\Legacy\Model;
 
 class clsPmieducarMatricula extends Model
@@ -393,6 +395,10 @@ class clsPmieducarMatricula extends Model
     public function edita()
     {
         if (is_numeric($this->cod_matricula)) {
+            if (in_array((int) $this->aprovado, [1, 2, 3, 7, 8, 10, 12, 13, 14], true)) {
+                $registration = LegacyRegistration::findOrFail($this->cod_matricula);
+                app(NativePhysicalGuard::class)->assertConfirmed($registration);
+            }
             $db = new clsBanco;
             $gruda = '';
             $set = '';

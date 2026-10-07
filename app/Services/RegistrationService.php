@@ -87,7 +87,7 @@ class RegistrationService
     public function updateStatus(LegacyRegistration $registration, $data)
     {
         $status = $data['nova_situacao'];
-        if (in_array((int) $status, [1, 2, 3], true)) {
+        if (in_array((int) $status, [1, 2, 3, 7, 8, 10, 12, 13, 14], true)) {
             app(NativePhysicalGuard::class)->assertConfirmed($registration);
         }
 

@@ -4,6 +4,7 @@ namespace App\Services\SchoolClass;
 
 use App\Models\LegacyEnrollment;
 use App\Models\LegacySchoolClass;
+use App\Models\RegistrationStatus;
 use DateTime;
 use iEducar\Modules\Educacenso\Model\TipoAtendimentoTurma;
 use iEducar\Modules\SchoolClass\Period;
@@ -43,7 +44,7 @@ class AvailableTimeService
                 $enrollmentsQuery->whereHas('registration', function ($registrationQuery) use ($studentId, $schoolClass) {
                     $registrationQuery->where('ref_cod_aluno', $studentId);
                     $registrationQuery->where('ano', $schoolClass->ano);
-                    $registrationQuery->where('aprovado', 3);
+                    $registrationQuery->whereIn('aprovado', [3, RegistrationStatus::PRE_REGISTRATION]);
                     $registrationQuery->where('ativo', 1);
                 })->where('ativo', 1);
 
@@ -178,7 +179,7 @@ class AvailableTimeService
                     $query->where('ref_cod_aluno', $studentId);
                     $query->where('ano', $otherSchoolClass->ano);
                     $query->where('ativo', 1);
-                    $query->where('aprovado', 3);
+                    $query->whereIn('aprovado', [3, RegistrationStatus::PRE_REGISTRATION]);
                 })
                 ->where('ativo', 1)
                 ->value('turno_id');

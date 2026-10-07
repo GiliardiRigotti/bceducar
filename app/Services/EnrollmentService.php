@@ -191,7 +191,21 @@ class EnrollmentService
         DateTime $date,
         $isRelocatedSameClassGroup = false
     ) {
-        app(NativePhysicalGuard::class)->assertConfirmed($registration);
+        return DB::transaction(function () use ($registration, $schoolClass, $date, $isRelocatedSameClassGroup) {
+            $schoolClass = LegacySchoolClass::query()->lockForUpdate()->findOrFail($schoolClass->getKey());
+            $registration = LegacyRegistration::query()->lockForUpdate()->findOrFail($registration->getKey());
+
+            return $this->performEnrollment($registration, $schoolClass, $date, $isRelocatedSameClassGroup);
+        });
+    }
+
+    private function performEnrollment(
+        LegacyRegistration $registration,
+        LegacySchoolClass $schoolClass,
+        DateTime $date,
+        $isRelocatedSameClassGroup = false
+    ) {
+        app(NativePhysicalGuard::class)->assertCanEnroll($registration, $schoolClass);
 
         if ($schoolClass->denyEnrollmentsWhenNoVacancy() && empty($schoolClass->vacancies)) {
             throw new NoVacancyException($schoolClass);

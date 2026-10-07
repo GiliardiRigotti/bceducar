@@ -1,4 +1,4 @@
-> Documento histórico. A fonte atual é [BC-EDUCAR-CONTEXTO-MESTRE.md](BC-EDUCAR-CONTEXTO-MESTRE.md).
+> Documento histórico. A fonte atual é [BC-EDUCAR-CONTEXTO-MESTRE-V3.md](BC-EDUCAR-CONTEXTO-MESTRE-V3.md).
 
 # Matrícula digital e presencial
 

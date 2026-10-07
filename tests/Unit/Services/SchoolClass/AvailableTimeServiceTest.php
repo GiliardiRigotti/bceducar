@@ -104,6 +104,21 @@ class AvailableTimeServiceTest extends TestCase
         $this->assertFalse($this->service->isAvailable($registration->ref_cod_aluno, $schoolClass->cod_turma));
     }
 
+    public function test_intermediate_reservation_blocks_conflicting_schedule_until_cancelled(): void
+    {
+        $class = LegacySchoolClassFactory::new()->morning()->create(['tipo_mediacao_didatico_pedagogico' => 1]);
+        $other = LegacySchoolClassFactory::new()->morning()->create(['tipo_mediacao_didatico_pedagogico' => 1, 'ano' => $class->ano]);
+        $registration = LegacyRegistrationFactory::new()->create(['ano' => $class->ano, 'aprovado' => 11, 'ativo' => 1]);
+        LegacySchoolClassStageFactory::new()->create(['ref_cod_turma' => $class]);
+        LegacySchoolClassStageFactory::new()->create(['ref_cod_turma' => $other]);
+        $enrollment = LegacyEnrollmentFactory::new()->active()->create([
+            'ref_cod_turma' => $other->cod_turma, 'ref_cod_matricula' => $registration->cod_matricula,
+        ]);
+        $this->assertFalse($this->service->isAvailable($registration->ref_cod_aluno, $class->cod_turma));
+        $enrollment->update(['ativo' => 0]);
+        $this->assertTrue($this->service->isAvailable($registration->ref_cod_aluno, $class->cod_turma));
+    }
+
     /**
      * @return void
      */

@@ -37,10 +37,11 @@ class NativePhysicalProtectionTest extends PhysicalConfirmationTest
         return [$application, $actor, LegacyRegistration::findOrFail($application->intermediate_registration_id)];
     }
 
-    public function test_native_service_blocks_enrollment_before_physical_review(): void
+    public function test_native_service_prevents_duplicate_intermediate_enrollment(): void
     {
         [$application, $actor, $registration] = $this->integrated();
         $class = $application->schoolClass;
+        $this->assertSame(1, $registration->activeEnrollments()->count());
         $this->expectException(ValidationException::class);
         (new EnrollmentService($actor))->enroll($registration, $class, max(now()->startOfDay(), $class->begin_academic_year));
     }
@@ -48,18 +49,46 @@ class NativePhysicalProtectionTest extends PhysicalConfirmationTest
     public function test_native_status_service_blocks_promotion_before_physical_review(): void
     {
         [$application, $actor, $registration] = $this->integrated();
+        foreach ([1, 2, 3, 7, 8, 10, 12, 13, 14] as $status) {
+            try {
+                (new RegistrationService($actor))->updateStatus($registration, ['nova_situacao' => $status]);
+                $this->fail('Promoção nativa sem conferência física deveria ser bloqueada.');
+            } catch (ValidationException $error) {
+                $this->assertArrayHasKey('physical', $error->errors());
+                $this->assertSame(11, $registration->fresh()->aprovado);
+            }
+        }
+    }
+
+    public function test_legacy_status_update_cannot_bypass_physical_confirmation(): void
+    {
+        [$application, $actor, $registration] = $this->integrated();
+        $legacy = new \clsPmieducarMatricula(cod_matricula: $registration->getKey(), aprovado: 3);
         $this->expectException(ValidationException::class);
-        (new RegistrationService($actor))->updateStatus($registration, ['nova_situacao' => 3]);
+        $legacy->edita();
+    }
+
+    public function test_legacy_enrollment_uses_native_guard_and_cannot_duplicate_reservation(): void
+    {
+        [$application, $actor, $registration] = $this->integrated();
+        $legacy = new \clsPmieducarMatriculaTurma(ref_cod_matricula: $registration->getKey(),
+            ref_cod_turma: $application->school_class_id, ref_usuario_cad: $actor->getKey());
+        $legacy->data_enturmacao = now()->toDateString();
+        $this->expectException(ValidationException::class);
+        $legacy->cadastra();
     }
 
     public function test_original_rejection_closes_bc_and_cancels_intermediate_registration(): void
     {
         [$application, $actor, $registration] = $this->integrated();
+        $vacancies = $application->schoolClass->vacancies;
         app(RejectPreRegistrations::class)(null, ['ids' => [$application->pmd_preregistration_id], 'justification' => 'Auditoria transacional.']);
         $this->assertSame(PreRegistration::STATUS_REJECTED, $application->preregistration->fresh()->status);
         $this->assertSame('INDEFERIDA', $application->fresh()->status->value);
         $this->assertSame(11, $registration->fresh()->aprovado);
         $this->assertEquals(0, $registration->fresh()->ativo);
+        $this->assertFalse($registration->activeEnrollments()->exists());
+        $this->assertSame($vacancies + 1, $application->schoolClass->fresh()->vacancies);
     }
 
     public function test_cadastral_correction_blocks_changes_after_physical_retry_deadline(): void
@@ -171,6 +200,8 @@ class NativePhysicalProtectionTest extends PhysicalConfirmationTest
     public function test_backfill_changes_only_matching_bc_intermediate_registration(): void
     {
         [$application, $actor, $registration] = $this->integrated();
+        // Historical migration applies only to the V2 fixture without enrollment.
+        $registration->activeEnrollments()->update(['ativo' => 0]);
         $registration->update(['turno_pre_matricula' => null]);
         $unlinked = $registration->replicate();
         $unlinked->saveOrFail();
@@ -180,18 +211,16 @@ class NativePhysicalProtectionTest extends PhysicalConfirmationTest
         $this->assertNull($unlinked->fresh()->turno_pre_matricula);
     }
 
-    public function test_native_enrollment_failure_rolls_back_physical_confirmation_and_promotion(): void
+    public function test_missing_intermediate_enrollment_blocks_promotion_without_consuming_another_vacancy(): void
     {
         [$application, $actor, $registration] = $this->integrated();
         foreach ($application->documents()->pluck('id')->map(fn ($id) => 'document:'.$id)->push('cadastro') as $subject) {
             app(PhysicalConfirmation::class)->review($application, $actor, $subject, true, null);
         }
-        $class = $application->schoolClass;
-        $class->academicYearStages()->update(['data_fim' => now()->subDay()]);
-        $class->schoolClassStages()->update(['data_fim' => now()->subDay()]);
+        $registration->activeEnrollments()->update(['ativo' => 0]);
         try {
             app(PhysicalConfirmation::class)->confirm($application, $actor);
-            $this->fail('A regra de calendário nativa deveria bloquear a enturmação.');
+            $this->fail('A confirmação não deve criar uma nova enturmação.');
         } catch (ValidationException $error) {
             $this->assertArrayHasKey('physical', $error->errors());
         }

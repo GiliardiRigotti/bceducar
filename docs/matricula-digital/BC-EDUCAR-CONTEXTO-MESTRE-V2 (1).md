@@ -1,4 +1,4 @@
-> Arquivo recebido preservado como hist?rico. Vers?o vigente: [BC-EDUCAR-CONTEXTO-MESTRE.md](BC-EDUCAR-CONTEXTO-MESTRE.md).
+> Arquivo recebido preservado como hist?rico. Vers?o vigente: [BC-EDUCAR-CONTEXTO-MESTRE-V3.md](BC-EDUCAR-CONTEXTO-MESTRE-V3.md).
 
 # BC Educar --- Contexto Mestre Único
 

@@ -190,6 +190,8 @@ class EnrollmentServiceTest extends TestCase
         ]);
 
         $enrollment->schoolClass->max_aluno = 0;
+        // Capacity is read from the locked database row, as in a real school configuration change.
+        $enrollment->schoolClass->save();
 
         $this->service->enroll(
             $enrollment->registration,

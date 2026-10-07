@@ -7,12 +7,14 @@ use App\EnrollmentRequests\DeclaredStudentData;
 use App\EnrollmentRequests\DocumentStatus;
 use App\EnrollmentRequests\GuardianProfiles;
 use App\EnrollmentRequests\PhysicalConfirmation;
+use App\EnrollmentRequests\PmdBridge;
 use App\EnrollmentRequests\PmdIntake;
 use App\EnrollmentRequests\RegistrationWorkflow;
 use App\Mail\GuardianRegistrationNotice;
 use App\Models\BcDemoEntity;
 use App\Models\LegacyEnrollment;
 use App\Models\LegacyRegistration;
+use App\Models\LegacyStudent;
 use App\Models\LegacyUser;
 use App\Models\RegistrationRequest;
 use Carbon\Carbon;
@@ -90,15 +92,25 @@ class PhysicalConfirmationTest extends TestCase
         $service->review($this->application, $this->actor, 'cadastro', true, null);
     }
 
-    public function test_digital_approval_integrates_without_enrollment_and_physical_confirmation_promotes_once(): void
+    public function test_digital_approval_reserves_vacancy_and_physical_confirmation_promotes_once(): void
     {
         $people = DB::table('cadastro.pessoa')->count();
+        $class = $this->application->schoolClass;
+        $vacancies = $class->vacancies;
+        $occupancy = $class->getTotalEnrolled();
         $this->approve();
         $this->assertSame(2, $this->application->workflow_version);
         $this->assertSame($people + 2, DB::table('cadastro.pessoa')->count());
         $id = $this->application->intermediate_registration_id;
         $this->assertSame(11, LegacyRegistration::findOrFail($id)->aprovado);
-        $this->assertFalse(LegacyEnrollment::where('ref_cod_matricula', $id)->exists());
+        $this->assertTrue(LegacyEnrollment::where('ref_cod_matricula', $id)->exists());
+        $enrollmentId = LegacyEnrollment::where('ref_cod_matricula', $id)->value('id');
+        $this->assertSame($occupancy + 1, $class->fresh()->getTotalEnrolled());
+        $this->assertSame($vacancies - 1, $class->fresh()->vacancies);
+        $this->assertEquals($vacancies - 1, DB::table('classrooms')->where('id', $class->getKey())->value('available_vacancies'));
+        $this->assertEquals($vacancies - 1, DB::table('classrooms')->where('id', $class->getKey())->value('available'));
+        $this->assertSame(11, $class->getActiveEnrollments()->firstWhere('id', $enrollmentId)->registration->aprovado);
+        $this->assertSame('Vaga reservada — aguardando conferência física', $this->application->documentationLabel());
         $this->assertNull($this->application->registration_id);
         $this->assertSame(PreRegistration::STATUS_IN_CONFIRMATION, $this->application->preregistration->status);
         $this->postJson(route('bc-registration.action', $this->application), ['action' => 'finalize'])->assertUnprocessable();
@@ -106,6 +118,8 @@ class PhysicalConfirmationTest extends TestCase
         $this->approve();
         $this->assertSame($id, $this->application->intermediate_registration_id);
         $this->assertSame($people + 2, DB::table('cadastro.pessoa')->count());
+        $this->assertSame($vacancies - 1, $class->fresh()->vacancies);
+        $class->update(['max_aluno' => $class->fresh()->getTotalEnrolled()]);
         $this->reviewAll();
         $this->post(route('bc-registration.action', $this->application), ['action' => 'finalize'])->assertRedirect()->assertSessionHasNoErrors();
         $this->application->refresh();
@@ -113,6 +127,8 @@ class PhysicalConfirmationTest extends TestCase
         $this->assertSame(3, LegacyRegistration::findOrFail($id)->aprovado);
         $this->assertSame(PreRegistration::STATUS_ACCEPTED, $this->application->preregistration->status);
         $this->assertSame(1, LegacyEnrollment::where('ref_cod_matricula', $id)->where('ativo', 1)->count());
+        $this->assertSame($enrollmentId, LegacyEnrollment::where('ref_cod_matricula', $id)->value('id'));
+        $this->assertSame(0, $class->fresh()->vacancies);
         $this->assertNotNull($this->application->physical_confirmed_at);
         $this->post(route('bc-registration.action', $this->application), ['action' => 'finalize'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(1, $this->application->events()->where('event', 'PHYSICAL_DOCUMENTATION_CONFIRMED')->count());
@@ -121,6 +137,7 @@ class PhysicalConfirmationTest extends TestCase
     public function test_individual_divergence_is_visible_and_blocks_confirmation_until_regularized(): void
     {
         $this->approve();
+        $vacancies = $this->application->schoolClass->vacancies;
         $this->reviewAll();
         $document = $this->application->documents->first();
         $this->post(route('bc-registration.physical.review', $this->application), [
@@ -128,7 +145,8 @@ class PhysicalConfirmationTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->postJson(route('bc-registration.action', $this->application), ['action' => 'finalize'])->assertUnprocessable();
         $this->assertSame(11, LegacyRegistration::findOrFail($this->application->intermediate_registration_id)->aprovado);
-        $this->assertFalse(LegacyEnrollment::where('ref_cod_matricula', $this->application->intermediate_registration_id)->exists());
+        $this->assertTrue(LegacyEnrollment::where('ref_cod_matricula', $this->application->intermediate_registration_id)->exists());
+        $this->assertSame($vacancies, $this->application->schoolClass->fresh()->vacancies);
         $profile = app(GuardianProfiles::class)->claim($this->application->pmd_preregistration_id);
         $this->withSession(['bc_guardian_profile_id' => $profile, 'bc_guardian_pmd_id' => $this->application->pmd_preregistration_id]);
         $this->get('/matricula-digital')->assertOk()->assertSee('Original ilegível: apresente segunda via.')->assertSee('Regularizar até');
@@ -195,6 +213,82 @@ class PhysicalConfirmationTest extends TestCase
         $this->assertNull($this->application->fresh()->physical_confirmed_at);
         $this->assertNull($this->application->fresh()->registration_id);
         $this->assertSame(PreRegistration::STATUS_IN_CONFIRMATION, $this->application->preregistration->fresh()->status);
+    }
+
+    public function test_full_class_blocks_integration_and_rolls_back_native_records(): void
+    {
+        $this->application->schoolClass->update(['max_aluno' => 0]);
+        $people = DB::table('cadastro.pessoa')->count();
+        $registrations = LegacyRegistration::count();
+        $enrollments = LegacyEnrollment::count();
+        app(RegistrationWorkflow::class)->approve($this->application, $this->actor);
+        $this->application->refresh();
+        $this->assertSame('ERROR', $this->application->integration_status);
+        $this->assertNull($this->application->intermediate_registration_id);
+        $this->assertNull($this->application->student_id);
+        $this->assertSame($people, DB::table('cadastro.pessoa')->count());
+        $this->assertSame($registrations, LegacyRegistration::count());
+        $this->assertSame($enrollments, LegacyEnrollment::count());
+        $this->assertSame(PreRegistration::STATUS_SUMMONED, $this->application->preregistration->status);
+    }
+
+    public function test_cancellation_releases_vacancy_preserves_student_and_is_idempotent(): void
+    {
+        $vacancies = $this->application->schoolClass->vacancies;
+        $this->approve();
+        $id = $this->application->intermediate_registration_id;
+        $student = $this->application->student_id;
+        $workflow = app(RegistrationWorkflow::class);
+        $workflow->close($this->application, $this->actor, true, 'Cancelamento decidido pela escola.');
+        $workflow->close($this->application, $this->actor, true, 'Cancelamento decidido pela escola.');
+        $this->assertEquals(0, LegacyRegistration::findOrFail($id)->ativo);
+        $this->assertSame(0, LegacyEnrollment::where('ref_cod_matricula', $id)->where('ativo', 1)->count());
+        $this->assertSame($vacancies, $this->application->schoolClass->fresh()->vacancies);
+        $this->assertEquals($vacancies, DB::table('classrooms')->where('id', $this->application->school_class_id)->value('available_vacancies'));
+        $this->assertNotNull(LegacyStudent::find($student));
+        $this->assertSame(PreRegistration::STATUS_REJECTED, $this->application->preregistration->fresh()->status);
+        $this->assertSame(1, $this->application->events()->where('event', 'REQUEST_CANCELLED')->count());
+    }
+
+    public function test_v2_without_enrollment_is_reported_and_explicit_retry_reserves_once(): void
+    {
+        $this->approve();
+        $id = $this->application->intermediate_registration_id;
+        LegacyEnrollment::where('ref_cod_matricula', $id)->update(['ativo' => 0]);
+        $vacancies = $this->application->schoolClass->fresh()->vacancies;
+        $this->assertSame('Matrícula intermediária — enturmação pendente', $this->application->documentationLabel());
+        $this->artisan('bc:report-intermediate-enrollments')->expectsOutputToContain('"matricula": ' . $id)->assertSuccessful();
+        $this->assertSame(0, LegacyEnrollment::where('ref_cod_matricula', $id)->where('ativo', 1)->count());
+        $this->approve();
+        $this->approve();
+        $this->assertSame($id, $this->application->intermediate_registration_id);
+        $this->assertSame(1, LegacyEnrollment::where('ref_cod_matricula', $id)->where('ativo', 1)->count());
+        $this->assertSame($vacancies - 1, $this->application->schoolClass->fresh()->vacancies);
+    }
+
+    public function test_final_sync_failure_rolls_back_promotion_and_preserves_reserved_vacancy(): void
+    {
+        $this->approve();
+        $this->reviewAll();
+        $id = $this->application->intermediate_registration_id;
+        $enrollmentId = LegacyEnrollment::where('ref_cod_matricula', $id)->value('id');
+        $vacancies = $this->application->schoolClass->vacancies;
+        $this->mock(PmdBridge::class)->shouldReceive('sync')->once()
+            ->andThrow(new \RuntimeException('Falha simulada na sincronização final.'));
+        try {
+            app(PhysicalConfirmation::class)->confirm($this->application, $this->actor);
+            $this->fail('A falha de sincronização deveria impedir a efetivação.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Falha simulada na sincronização final.', $error->getMessage());
+        }
+        $this->application->refresh();
+        $this->assertNull($this->application->registration_id);
+        $this->assertNull($this->application->physical_confirmed_at);
+        $this->assertSame(11, LegacyRegistration::findOrFail($id)->aprovado);
+        $this->assertSame($enrollmentId, LegacyEnrollment::where('ref_cod_matricula', $id)->where('ativo', 1)->value('id'));
+        $this->assertSame($vacancies, $this->application->schoolClass->fresh()->vacancies);
+        $this->assertSame(PreRegistration::STATUS_IN_CONFIRMATION, $this->application->preregistration->status);
+        $this->assertSame(0, $this->application->events()->where('event', 'PHYSICAL_DOCUMENTATION_CONFIRMED')->count());
     }
 
     public function test_process_physical_deadlines_are_snapshotted_and_retry_notice_never_claims_final_enrollment(): void

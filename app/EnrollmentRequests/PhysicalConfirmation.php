@@ -2,7 +2,6 @@
 
 namespace App\EnrollmentRequests;
 
-use App\Models\LegacyEnrollment;
 use App\Models\LegacyRegistration;
 use App\Models\LegacySchoolClass;
 use App\Models\LegacyStudent;
@@ -77,7 +76,8 @@ class PhysicalConfirmation
                 $pmd = $this->approved($request, integration: true);
                 $class = $this->classroom($request, $pmd);
                 if ($request->intermediate_registration_id) {
-                    $this->nativeRegistration($request);
+                    $registration = $this->nativeRegistration($request);
+                    $this->reserve($request, $registration, $class, $actor);
                     app(PmdBridge::class)->sync($request);
 
                     return true;
@@ -89,7 +89,8 @@ class PhysicalConfirmation
                 $registration = $candidates->first();
                 if ($candidates->count() > 1 || ($registration && (
                     $registration->ref_ref_cod_escola !== $request->school_id || $registration->ref_ref_cod_serie !== $request->grade_id
-                    || $registration->activeEnrollments()->exists()
+                    || $registration->activeEnrollments()->count() > 1
+                    || $registration->activeEnrollments()->where('ref_cod_turma', '!=', $class->getKey())->exists()
                     || RegistrationRequest::query()->where('intermediate_registration_id', $registration->getKey())->exists()
                 ))) {
                     $this->fail('Pré-matrícula nativa existente requer conferência do vínculo antes de reprocessar.');
@@ -112,6 +113,7 @@ class PhysicalConfirmation
                 $request->update(['intermediate_registration_id' => $registration->getKey(),
                     'integration_status' => 'INTEGRATED', 'integrated_at' => now(),
                     'physical_deadline' => now()->addDays($pmd->process->physical_delivery_days ?? 7)->endOfDay()]);
+                $this->reserve($request, $registration, $class, $actor);
                 app(PmdBridge::class)->sync($request);
                 app(RegistrationWorkflow::class)->event($request, EventType::NativeIntegrated, $actor,
                     metadata: ['registration_id' => $registration->getKey(), 'native_status' => RegistrationStatus::PRE_REGISTRATION,
@@ -144,12 +146,28 @@ class PhysicalConfirmation
         if ($registration->ref_cod_aluno !== $request->student_id || $registration->ref_ref_cod_escola !== $request->school_id
             || $registration->ref_ref_cod_serie !== $request->grade_id || (int) $registration->ano !== (int) $request->school_year
             || (int) $registration->turno_pre_matricula !== (int) $request->schoolClass->turma_turno_id
-            || !$registration->ativo || $registration->aprovado !== RegistrationStatus::PRE_REGISTRATION
-            || $registration->activeEnrollments()->exists()) {
-            $this->fail('O vínculo nativo intermediário diverge da solicitação ou já possui enturmação.');
+            || !$registration->ativo || $registration->aprovado !== RegistrationStatus::PRE_REGISTRATION) {
+            $this->fail('O vínculo nativo intermediário diverge da solicitação.');
+        }
+        $enrollments = $registration->activeEnrollments()->get();
+        if ($enrollments->count() > 1 || $enrollments->contains(fn ($enrollment) => $enrollment->ref_cod_turma != $request->school_class_id)) {
+            $this->fail('A enturmação intermediária diverge da solicitação.');
         }
 
         return $registration;
+    }
+
+    private function reserve(RegistrationRequest $request, LegacyRegistration $registration, LegacySchoolClass $class, User $actor): void
+    {
+        if ($registration->activeEnrollments()->exists()) {
+            return;
+        }
+        if ($class->getTotalEnrolled() >= $class->max_aluno) {
+            $this->fail('Turma lotada. Não foi possível reservar a vaga.');
+        }
+        (new EnrollmentService($actor))->enroll($registration, $class, max(now()->startOfDay(), $class->begin_academic_year));
+        app(RegistrationWorkflow::class)->event($request, EventType::Enrolled, $actor,
+            metadata: ['school_class_id' => $class->getKey(), 'intermediate' => true]);
     }
 
     public function review(RegistrationRequest $request, User $actor, string $subject, bool $approved, ?string $reason): void
@@ -217,21 +235,15 @@ class PhysicalConfirmation
             if (!$request->student->inepNumber && $request->grade->exigir_inep) {
                 $this->fail('A série exige o código INEP do aluno. Regularize no cadastro nativo.');
             }
-            if (LegacyEnrollment::query()->where('ref_cod_turma', $class->getKey())->where('ativo', 1)->count() >= $class->max_aluno) {
+            if (!$registration->activeEnrollments()->exists()) {
+                $this->fail('Matrícula intermediária sem enturmação. Reprocesse a integração para reservar a vaga.');
+            }
+            if ($class->getTotalEnrolled() > $class->max_aluno) {
                 $this->fail('Turma lotada. A pré-matrícula permanece em confirmação.');
             }
-            $date = max(now()->startOfDay(), $class->begin_academic_year);
             // Persist inside this transaction only after every physical/native check; rollback on any failure.
             $request->update(['physical_confirmed_at' => now(), 'physical_confirmed_by' => $actor->getKey()]);
             (new RegistrationService($actor))->updateStatus($registration, ['nova_situacao' => RegistrationStatus::ONGOING]);
-            try {
-                (new EnrollmentService($actor))->enroll($registration, $class, $date);
-            } catch (\Throwable $error) {
-                if (str_starts_with($error::class, 'App\\Exceptions\\Enrollment\\')) {
-                    $this->fail('A regra nativa impediu a enturmação. Confira vagas, calendário e vínculos do aluno antes de confirmar.');
-                }
-                throw $error;
-            }
             LegacyRegistration::query()->where('ref_cod_aluno', $request->student_id)->whereKeyNot($registration->getKey())->update(['ultima_matricula' => 0]);
             $registration->update(['ultima_matricula' => 1]);
             $request->update(['status' => RequestStatus::Registered, 'registration_id' => $registration->getKey(),
@@ -239,7 +251,6 @@ class PhysicalConfirmation
             $workflow = app(RegistrationWorkflow::class);
             $workflow->event($request, EventType::PhysicalConfirmed, $actor);
             $workflow->event($request, EventType::Registered, $actor, metadata: ['registration_id' => $registration->getKey(), 'movement' => 'ENROLLMENT']);
-            $workflow->event($request, EventType::Enrolled, $actor, metadata: ['school_class_id' => $class->getKey()]);
             app(PmdBridge::class)->sync($request);
 
             return $registration;

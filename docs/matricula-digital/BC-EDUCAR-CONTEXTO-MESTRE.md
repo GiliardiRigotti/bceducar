@@ -1,3 +1,5 @@
+> Documento histórico V2, preservado para consulta. A fonte normativa vigente é [BC-EDUCAR-CONTEXTO-MESTRE-V3.md](BC-EDUCAR-CONTEXTO-MESTRE-V3.md). As declarações de precedência abaixo pertencem à versão histórica.
+
 # BC Educar --- Contexto Mestre Único
 
 **Versão consolidada:** 05/10/2026\

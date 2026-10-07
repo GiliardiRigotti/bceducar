@@ -1,5 +1,18 @@
 # Histórico de alterações
 
+## 06/10/2026 — Fluxo V3 de matrícula e enturmação
+
+- Fonte normativa vigente: [BC-EDUCAR-CONTEXTO-MESTRE-V3.md](BC-EDUCAR-CONTEXTO-MESTRE-V3.md); V1/V2 preservados como históricos.
+- Matrícula intermediária continua utilizando situação 11 e ID separado da definitiva.
+- Enturmação nativa ocorre após aprovação documental e integração cadastral; reserva e contabiliza a vaga.
+- Removido o bloqueio de enturmação pré-conferência; mantido o bloqueio de promoção definitiva pré-conferência.
+- Conferência física e regularização continuam obrigatórias para efetivação.
+- Cancelamento intermediário desativa a enturmação pelo serviço nativo e libera a vaga.
+- Efetivação reutiliza a enturmação existente, inclusive na última vaga da turma.
+- Proteções contra dupla contagem/enturmação e validação transacional de capacidade com bloqueio da turma.
+- Comando somente leitura `bc:report-intermediate-enrollments` para levantamento V2; reprocessamento explícito da integração é idempotente. Nenhuma conversão em massa ou migration de dados.
+
+
 ## 05/10/2026 — Adoção do contexto mestre V2
 
 - Fonte vigente consolidada em BC-EDUCAR-CONTEXTO-MESTRE.md; documentos anteriores identificados como históricos e preservados.

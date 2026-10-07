@@ -414,16 +414,26 @@ class RegistrationWorkflow
     {
         DB::transaction(function () use ($request, $actor, $cancel, $reason) {
             $request = $this->locked($request, $actor);
+            if (trim($reason) && $request->status === ($cancel ? RequestStatus::Cancelled : RequestStatus::Rejected)) {
+                return;
+            }
             if (($request->status->terminal() && !in_array($request->status, [RequestStatus::Expired, RequestStatus::NoShow]))
                 || !trim($reason)) {
                 $this->fail('Informe um motivo e utilize uma solicitação aberta.');
             }
             if ($request->workflow_version === 2 && $request->intermediate_registration_id) {
                 $native = LegacyRegistration::query()->lockForUpdate()->findOrFail($request->intermediate_registration_id);
-                if ($native->aprovado !== RegistrationStatus::PRE_REGISTRATION || $native->activeEnrollments()->exists()) {
+                if ($native->aprovado !== RegistrationStatus::PRE_REGISTRATION
+                    || $native->ref_cod_aluno != $request->student_id
+                    || $native->ref_ref_cod_escola != $request->school_id
+                    || $native->ref_ref_cod_serie != $request->grade_id
+                    || (int) $native->ano !== (int) $request->school_year
+                    || $native->activeEnrollments()->where('ref_cod_turma', '!=', $request->school_class_id)->exists()) {
                     $this->fail('O vínculo nativo foi alterado. Confira a matrícula antes de encerrar.');
                 }
-                (new RegistrationService($actor))->cancelRegistration($native);
+                if ($native->ativo) {
+                    (new RegistrationService($actor))->cancelRegistration($native);
+                }
             }
             $before = $request->status->value;
             $request->update(['status' => $cancel ? RequestStatus::Cancelled : RequestStatus::Rejected,

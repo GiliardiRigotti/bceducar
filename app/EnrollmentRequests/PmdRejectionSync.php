@@ -27,11 +27,18 @@ class PmdRejectionSync
             $actor = Auth::guard('web')->user();
             if ($request->workflow_version === 2 && $request->intermediate_registration_id) {
                 $native = LegacyRegistration::query()->lockForUpdate()->findOrFail($request->intermediate_registration_id);
-                if ($native->aprovado !== RegistrationStatus::PRE_REGISTRATION || $native->activeEnrollments()->exists()) {
+                if ($native->aprovado !== RegistrationStatus::PRE_REGISTRATION
+                    || $native->ref_cod_aluno != $request->student_id
+                    || $native->ref_ref_cod_escola != $request->school_id
+                    || $native->ref_ref_cod_serie != $request->grade_id
+                    || (int) $native->ano !== (int) $request->school_year
+                    || $native->activeEnrollments()->where('ref_cod_turma', '!=', $request->school_class_id)->exists()) {
                     throw ValidationException::withMessages(['registration' => 'O vínculo nativo foi alterado. Confira a matrícula antes de indeferir.']);
                 }
                 $actor ??= User::query()->findOrFail($native->ref_usuario_cad);
-                (new RegistrationService($actor))->cancelRegistration($native);
+                if ($native->ativo) {
+                    (new RegistrationService($actor))->cancelRegistration($native);
+                }
             }
             $before = $request->status->value;
             $request->update(['status' => RequestStatus::Rejected, 'rejected_at' => now(), 'updated_by' => $actor?->getKey()]);

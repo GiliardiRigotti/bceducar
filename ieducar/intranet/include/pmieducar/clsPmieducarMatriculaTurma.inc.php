@@ -1,5 +1,11 @@
 <?php
 
+use App\Models\LegacyRegistration;
+use App\Models\LegacySchoolClass;
+use App\Models\RegistrationRequest;
+use App\Services\EnrollmentService;
+use App\User;
+use Carbon\Carbon;
 use iEducar\Legacy\Model;
 
 class clsPmieducarMatriculaTurma extends Model
@@ -116,6 +122,18 @@ class clsPmieducarMatriculaTurma extends Model
     {
         if (is_numeric($this->ref_cod_matricula) && is_numeric($this->ref_cod_turma) &&
             is_numeric($this->ref_usuario_cad)) {
+            // BC intermediate links use the same guarded native service as the V3 integration.
+            if (RegistrationRequest::query()->where('workflow_version', 2)
+                ->where('intermediate_registration_id', $this->ref_cod_matricula)->exists()) {
+                $enrollment = (new EnrollmentService(User::findOrFail($this->ref_usuario_cad)))
+                    ->enroll(LegacyRegistration::findOrFail($this->ref_cod_matricula),
+                        LegacySchoolClass::findOrFail($this->ref_cod_turma),
+                        Carbon::parse($this->data_enturmacao));
+                $this->sequencial = $enrollment->sequencial;
+                $this->detalhe();
+
+                return true;
+            }
             $db = new clsBanco;
 
             $campos = '';
