@@ -365,7 +365,7 @@ class RegistrationStageSeparationTest extends TestCase
     public function test_rollback_refuses_to_destroy_pending_choice_state(): void
     {
         $this->release();
-        $migration = require database_path('migrations/2026_10_05_180000_separate_document_choice_and_notice_origin.php');
+        $migration = require database_path('migrations/pmd/2026_10_05_180000_separate_document_choice_and_notice_origin.php');
         $this->expectException(\RuntimeException::class);
         $migration->down();
     }

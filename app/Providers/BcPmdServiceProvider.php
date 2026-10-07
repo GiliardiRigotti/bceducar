@@ -45,6 +45,10 @@ class BcPmdServiceProvider extends ServiceProvider
         if (!class_exists(PreRegistration::class)) {
             return;
         }
+        if ($this->app->runningInConsole()) {
+            // Host BC migrations interleave by timestamp with these; a separate --path run breaks clean installs.
+            $this->loadMigrationsFrom(database_path('migrations/pmd'));
+        }
         // Keep historical answers, but omit documentary choice from the intake form and its field configuration.
         ProcessField::addGlobalScope('bc_document_choice_after_release', fn ($query) => $query->whereNotIn('process_fields.field_id', Field::query()->where('internal', 'bc_attendance_mode')->select('id')));
         PreRegistration::created(function ($pmd) {

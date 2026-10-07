@@ -205,7 +205,7 @@ class NativePhysicalProtectionTest extends PhysicalConfirmationTest
         $registration->update(['turno_pre_matricula' => null]);
         $unlinked = $registration->replicate();
         $unlinked->saveOrFail();
-        $migration = require database_path('migrations/2026_10_05_234000_backfill_bc_intermediate_registration_shift.php');
+        $migration = require database_path('migrations/pmd/2026_10_05_234000_backfill_bc_intermediate_registration_shift.php');
         $migration->up();
         $this->assertEquals($application->schoolClass->turma_turno_id, $registration->fresh()->turno_pre_matricula);
         $this->assertNull($unlinked->fresh()->turno_pre_matricula);
