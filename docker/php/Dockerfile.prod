@@ -11,7 +11,7 @@ LABEL maintainer="Portabilis <contato@portabilis.com.br>"
 ENV COMPOSER_ALLOW_SUPERUSER 1
 ENV COMPOSER_PROCESS_TIMEOUT 900
 
-# Mesma base da imagem de desenvolvimento, sem Xdebug e com OPcache.
+# Mesma base da imagem de desenvolvimento, sem Xdebug. O OPcache já é embutido no PHP 8.5.
 RUN apk add --update \
     libc-dev \
     libpng-dev  \
@@ -28,7 +28,7 @@ RUN apk add --update \
 RUN apk add --no-cache --virtual .phpize_deps $PHPIZE_DEPS \
     && pecl install redis \
     && docker-php-ext-enable redis \
-    && docker-php-ext-install bcmath gd pcntl pdo pdo_pgsql pgsql zip ftp opcache \
+    && docker-php-ext-install bcmath gd pcntl pdo pdo_pgsql pgsql zip ftp \
     && apk del .phpize_deps
 
 COPY production.ini /usr/local/etc/php/conf.d/zz-production.ini

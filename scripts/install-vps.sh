@@ -28,7 +28,9 @@ done
 
 [[ -f .env ]] || fail "Crie o .env a partir de .env.production.example antes de continuar."
 grep -Eq '^[A-Z_]+=.*TROCAR' .env && fail "O .env ainda contém valores TROCAR."
-grep -Eq '^APP_ENV=production\s*$' .env || fail "APP_ENV deve ser production."
+APP_ENV_VALUE="$(grep -E '^APP_ENV=' .env | tail -1 | cut -d= -f2- | tr -d "\"' \r")"
+[[ "$APP_ENV_VALUE" == "production" || "$APP_ENV_VALUE" == "homologation" ]] \
+    || fail "APP_ENV deve ser production ou homologation."
 grep -Eq '^APP_DEBUG=false\s*$' .env || fail "APP_DEBUG deve ser false."
 
 step "Pré-Matrícula Digital na revisão $PMD_REVISION"
@@ -111,7 +113,13 @@ done
 artisan migrate --force "${host_paths[@]}"
 artisan migrate --force
 artisan migrate --force --path=database/migrations/pmd
-artisan bc:pmd-configure
+if [[ "$APP_ENV_VALUE" == "homologation" ]]; then
+    artisan bc:pmd-configure
+else
+    # bc:pmd-configure é bloqueado em produção por decisão do projeto.
+    echo "Produção: configure em Configurações do i-Educar as chaves prematricula.city, prematricula.ibge_codes,"
+    echo "prematricula.map.lat/lng e prematricula.link_to_restrict_area (/matricula-digital)."
+fi
 artisan vendor:publish --tag=pmd --force
 
 step "Cache de views"

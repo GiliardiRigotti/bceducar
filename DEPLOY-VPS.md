@@ -45,6 +45,8 @@ cp .env.production.example .env
 scripts/install-vps.sh
 ```
 
+Use `APP_ENV=homologation` para um servidor de homologação: o script então executa `bc:pmd-configure` (município e mapa de Balneário Camboriú), que o projeto bloqueia em produção. Em produção, ajuste essas chaves `prematricula.*` em Configurações.
+
 O script obtém PMD e transporte nas revisões fixadas, aplica `patches/pmd`, instala dependências sem pacotes de desenvolvimento, compila a interface PMD, executa as migrações na mesma ordem de `scripts/install-pmd.ps1` e sobe os serviços. Também serve para atualizações: rode novamente após `git pull`.
 
 Depois da instalação, siga a configuração funcional de [INSTALL-PMD.md](INSTALL-PMD.md) (município, processos, coordenadas das escolas) e de [INSTALL-TRANSPORTE.md](INSTALL-TRANSPORTE.md). Não execute seeders de demonstração em produção.
