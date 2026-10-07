@@ -1,5 +1,15 @@
 # Histórico de alterações
 
+## 06/10/2026 — Design do painel de matrículas
+
+- Painel alinhado às cores, tipografia, cartões e controles do BC Educar, com estilos isolados das outras telas.
+- Indicadores com hierarquia clara; nomenclatura de documentação aprovada distingue conferência física de efetivação.
+- Filtros organizados em grade, indicação de filtros ativos e remoção individual; resumo por escola e detalhamento preservados.
+- Tabela reduzida a seis colunas, com progresso documental, situação legível, ação explícita e histórico acessível por solicitação.
+- Apresentação em cartões no celular, foco visível, estados vazios orientativos e paginação própria com preservação de filtros.
+- Validação: RegistrationDashboardTest, 15 testes/224 asserções aprovados; paginação com filtros verificada, templates Blade compilados e páginas autenticadas/CSS com HTTP 200 para administrador e operador. Inspeção visual no navegador bloqueada por falha de inicialização da ferramenta; homologação visual permanece pendente.
+
+
 ## 06/10/2026 — Fluxo V3 de matrícula e enturmação
 
 - Fonte normativa vigente: [BC-EDUCAR-CONTEXTO-MESTRE-V3.md](BC-EDUCAR-CONTEXTO-MESTRE-V3.md); V1/V2 preservados como históricos.
