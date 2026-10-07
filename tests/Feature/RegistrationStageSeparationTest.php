@@ -7,6 +7,7 @@ use App\EnrollmentRequests\DeclaredStudentData;
 use App\EnrollmentRequests\DocumentStatus;
 use App\EnrollmentRequests\EventType;
 use App\EnrollmentRequests\RegistrationWorkflow;
+use App\EnrollmentRequests\RequestStatus;
 use App\Mail\GuardianRegistrationNotice;
 use App\Models\BcDemoEntity;
 use App\Models\LegacyUser;
@@ -376,5 +377,21 @@ class RegistrationStageSeparationTest extends TestCase
         DB::table('preregistrations')->where('id', $this->pmdId)->update(['status' => PreRegistration::STATUS_REJECTED]);
         $this->expectException(ValidationException::class);
         $this->release();
+    }
+
+    public function test_closed_documentary_request_cannot_be_released_silently(): void
+    {
+        $request = $this->release();
+        $request->update(['status' => RequestStatus::Expired]);
+        DB::table('preregistrations')->where('id', $this->pmdId)->update(['status' => PreRegistration::STATUS_WAITING]);
+        $events = $request->events()->count();
+        try {
+            $this->release();
+            $this->fail('O deferimento de solicitação encerrada deveria ser recusado.');
+        } catch (ValidationException $error) {
+            $this->assertStringContainsString('encerrada', $error->errors()['pmd'][0]);
+        }
+        $this->assertSame(PreRegistration::STATUS_WAITING, DB::table('preregistrations')->where('id', $this->pmdId)->value('status'));
+        $this->assertSame($events, $request->events()->count());
     }
 }
