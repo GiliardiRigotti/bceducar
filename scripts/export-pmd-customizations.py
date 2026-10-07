@@ -6,6 +6,13 @@ from pathlib import Path
 import shutil
 import subprocess
 
+
+def digest(data: bytes) -> str:
+    """Checksum independent of CRLF/LF conversion by Git (core.autocrlf) on Windows."""
+    if b"\0" not in data:
+        data = data.replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
+
 root = Path(__file__).resolve().parent.parent
 package = root / "packages/portabilis/pre-matricula-digital"
 bundle = root / "patches/pmd"
@@ -26,8 +33,8 @@ for name in extras:
     destination = bundle / "added" / name
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(package / name, destination)
-    files[name] = hashlib.sha256(destination.read_bytes()).hexdigest()
+    files[name] = digest(destination.read_bytes())
 (bundle / "bc-customizations.patch").write_bytes(patch)
 (bundle / "manifest.json").write_text(json.dumps({"revision": revision,
-    "patch_sha256": hashlib.sha256(patch).hexdigest(), "added": files}, indent=2) + "\n", encoding="utf-8")
+    "patch_sha256": digest(patch), "added": files}, indent=2) + "\n", encoding="utf-8")
 print("Delta BC/PMD atualizado. Revise e versione o conjunto antes de distribuir.")

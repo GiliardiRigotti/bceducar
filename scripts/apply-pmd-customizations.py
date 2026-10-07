@@ -8,13 +8,20 @@ import shutil
 import subprocess
 
 
+def digest(data: bytes) -> str:
+    """Checksum independent of CRLF/LF conversion by Git (core.autocrlf) on Windows."""
+    if b"\0" not in data:
+        data = data.replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
+
+
 def apply(package: Path, bundle: Path) -> None:
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     revision = subprocess.check_output(["git", "-C", str(package), "rev-parse", "HEAD"], text=True).strip()
     if revision != manifest["revision"]:
         raise RuntimeError("Revisão PMD incompatível com o delta BC.")
     patch = bundle / "bc-customizations.patch"
-    if hashlib.sha256(patch.read_bytes()).hexdigest() != manifest["patch_sha256"]:
+    if digest(patch.read_bytes()) != manifest["patch_sha256"]:
         raise RuntimeError("Checksum do patch BC inválido.")
     copies = []
     for name, expected in manifest["added"].items():
@@ -22,9 +29,9 @@ def apply(package: Path, bundle: Path) -> None:
         if relative.is_absolute() or ".." in relative.parts:
             raise RuntimeError("Caminho inválido no manifesto BC.")
         source, destination = bundle / "added" / relative, package / relative
-        if hashlib.sha256(source.read_bytes()).hexdigest() != expected:
+        if digest(source.read_bytes()) != expected:
             raise RuntimeError(f"Checksum inválido: {name}")
-        if destination.exists() and hashlib.sha256(destination.read_bytes()).hexdigest() != expected:
+        if destination.exists() and digest(destination.read_bytes()) != expected:
             raise RuntimeError(f"Alteração local conflitante: {name}")
         copies.append((source, destination))
     command = ["git", "-C", str(package), "apply", "--ignore-space-change"]
