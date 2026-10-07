@@ -2,6 +2,7 @@
 
 namespace App\EnrollmentRequests;
 
+use App\Rules\Cpf;
 use iEducar\Packages\PreMatricula\Models\PreRegistration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -13,7 +14,7 @@ class GuardianDependents
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'cpf' => ['nullable', 'regex:/^(?:[0-9]{11}|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})$/'],
+            'cpf' => ['nullable', new Cpf],
             'date_of_birth' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
             'gender' => ['nullable', 'integer', Rule::in([1, 2])],
             'rg' => ['nullable', 'string', 'max:50'],

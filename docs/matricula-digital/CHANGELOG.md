@@ -1,5 +1,11 @@
 # Histórico de alterações
 
+## 06/10/2026 — Validação cadastral e confirmação de acesso
+
+- CPF opcional de dependentes e da ficha cadastral passa a validar formato e dígitos verificadores com a regra existente do i-Educar; sequências repetidas e CPFs inválidos são rejeitados antes da gravação.
+- Confirmação de outra inscrição permanece expandida enquanto há código pendente ou erro de acesso, preserva os valores informados e oferece solicitação de novo código.
+- Validação: GuardianWorkspaceTest, GuardianDemoAccessTest e DeclaredStudentDataTest, 20 testes/201 asserções aprovados; Pint aprovado nos quatro arquivos PHP alterados; portal local respondeu HTTP 200. Inspeção visual permanece pendente por falha de inicialização do navegador integrado.
+
 ## 06/10/2026 — Design do painel de matrículas
 
 - Painel alinhado às cores, tipografia, cartões e controles do BC Educar, com estilos isolados das outras telas.

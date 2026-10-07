@@ -13,6 +13,7 @@ use App\EnrollmentRequests\RegistrationWorkflow;
 use App\Mail\GuardianAccessCode;
 use App\Models\RegistrationDocument;
 use App\Models\RegistrationRequest;
+use App\Rules\Cpf;
 use Database\Seeders\BalnearioCamboriuDemoSeeder;
 use iEducar\Packages\PreMatricula\Models\PreRegistration;
 use Illuminate\Http\RedirectResponse;
@@ -192,7 +193,7 @@ class GuardianDocumentController extends Controller
         $data = $request->validate([
             'student' => ['required', 'array:name,cpf,date_of_birth,gender,rg,birth_certificate,phone,mobile'],
             'student.name' => ['required', 'string', 'max:255'],
-            'student.cpf' => ['nullable', 'regex:/^(?:[0-9]{11}|[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2})$/'],
+            'student.cpf' => ['nullable', new Cpf],
             'student.date_of_birth' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
             'student.gender' => ['nullable', 'integer', Rule::in([1, 2])],
             'student.rg' => ['nullable', 'string', 'max:50'],

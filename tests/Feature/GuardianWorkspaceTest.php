@@ -7,6 +7,7 @@ use App\EnrollmentRequests\GuardianCommunications;
 use App\EnrollmentRequests\GuardianDependents;
 use App\EnrollmentRequests\GuardianProfiles;
 use App\EnrollmentRequests\PmdDocumentAudit;
+use App\Mail\GuardianAccessCode;
 use App\Models\BcDemoEntity;
 use App\Models\LegacyStudent;
 use App\Models\RegistrationRequest;
@@ -176,6 +177,46 @@ class GuardianWorkspaceTest extends TestCase
         $this->post('/matricula-digital/inscricoes/'.$other->id.'/dependente', [
             'dependent_id' => $this->dependent()->id, 'reason' => 'Mesmo estudante declarado.',
         ])->assertForbidden();
+    }
+
+    public function test_invalid_cpf_is_rejected_without_changing_the_dependent_or_application(): void
+    {
+        $dependent = $this->dependent();
+        $originalCpf = $this->pmd->student->cpf;
+        foreach (['11111111111', '000.000.000-00', '52998224724', 'abc52998224725'] as $cpf) {
+            $this->post('/matricula-digital/dependentes/'.$dependent->id, [
+                'name' => $dependent->name, 'cpf' => $cpf, 'reason' => 'Correção do CPF.',
+            ])->assertSessionHasErrors('cpf');
+            $this->post('/matricula-digital/ficha', [
+                'student' => ['name' => $dependent->name, 'date_of_birth' => '2014-01-01', 'cpf' => $cpf],
+                'reason' => 'Correção do CPF.',
+            ])->assertSessionHasErrors('student.cpf');
+        }
+        $this->assertSame($dependent->cpf, $this->dependent()->cpf);
+        $this->assertSame($originalCpf, $this->pmd->student->fresh()->cpf);
+        $this->assertFalse(DB::table('bc_guardian_dependent_events')->where('dependent_id', $dependent->id)
+            ->where('event', 'DEPENDENT_UPDATED')->exists());
+    }
+
+    public function test_dependent_accepts_valid_cpf_with_or_without_punctuation_and_optional_cpf(): void
+    {
+        foreach (['52998224725', '529.982.247-25', null] as $cpf) {
+            $this->post('/matricula-digital/dependentes', ['name' => 'Dependente CPF', 'cpf' => $cpf])
+                ->assertRedirect('/matricula-digital/perfil')->assertSessionHasNoErrors();
+            $this->assertTrue(DB::table('bc_guardian_dependents')->where('profile_id', $this->profileId)
+                ->where('name', 'Dependente CPF')->where('cpf', $cpf)->exists());
+        }
+    }
+
+    public function test_profile_keeps_the_code_confirmation_visible_after_requesting_access(): void
+    {
+        $this->from('/matricula-digital/perfil')->post('/matricula-digital/acesso', [
+            'protocol' => $this->pmd->protocol, 'email' => $this->pmd->responsible->email,
+        ])->assertRedirect('/matricula-digital/perfil')->assertSessionHas('bc_guardian_challenge');
+        Mail::assertSent(GuardianAccessCode::class);
+        $this->get('/matricula-digital/perfil')->assertOk()
+            ->assertSee('<details class="bc-school-summary"  open ', false)
+            ->assertSee('Solicitar novo código')->assertSee('Confirmar vínculo');
     }
 
     public function test_communications_paginate_and_profile_reading_does_not_change_other_profiles(): void

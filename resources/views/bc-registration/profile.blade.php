@@ -33,9 +33,9 @@
 <section class="card" id="matriculas"><h2>Matrículas</h2>
 @forelse($requests->whereNotNull('registration_id') as $application)<div class="row"><strong>Protocolo {{ $application->source_reference }}</strong><p>Matrícula i-Educar {{ $application->registration_id }}</p></div>@empty<p>Nenhuma matrícula efetivada nas inscrições confirmadas.</p>@endforelse</section>
 <section class="card" id="dados"><h2>Meus dados</h2><p>{{ $profile->name }}<br>{{ $profile->email }}</p>
-<details class="bc-school-summary"><summary>Confirmar outra inscrição<span class="bc-summary-toggle">Adicionar ao perfil</span></summary><div class="bc-summary-content">
+<details class="bc-school-summary" @if(session('bc_guardian_challenge') || $errors->hasAny(['protocol', 'email', 'code'])) open @endif><summary>Confirmar outra inscrição<span class="bc-summary-toggle">Adicionar ao perfil</span></summary><div class="bc-summary-content">
 <p>Informe o protocolo e o e-mail cadastrados na inscrição. Enviaremos um código para confirmar seu acesso.</p>
-<form method="post" action="{{ route('bc-guardian.access') }}">@csrf<label>Protocolo da inscrição<input name="protocol" required maxlength="100"></label><label>E-mail cadastrado<input type="email" name="email" required maxlength="255" value="{{ $profile->email }}"></label><button>Enviar código de acesso</button></form>
+<form method="post" action="{{ route('bc-guardian.access') }}">@csrf<label>Protocolo da inscrição<input name="protocol" required maxlength="100" value="{{ old('protocol') }}"></label><label>E-mail cadastrado<input type="email" name="email" required maxlength="255" value="{{ old('email', $profile->email) }}"></label><button>{{ session('bc_guardian_challenge') ? 'Solicitar novo código' : 'Enviar código de acesso' }}</button></form>
 @if(session('bc_guardian_challenge'))<form method="post" action="{{ route('bc-guardian.verify') }}">@csrf<label>Código<input name="code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"></label><button>Confirmar vínculo</button></form>@endif
 </div></details></section>
 <form method="post" action="{{ route('bc-guardian.logout') }}">@csrf<button class="bc-button-secondary">Sair</button></form>
