@@ -15,6 +15,7 @@ use iEducar\Packages\PreMatricula\Services\EnrollmentService as PmdEnrollmentSer
 use iEducar\Packages\PreMatricula\Services\RegistrationTransferService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class PhysicalConfirmation
@@ -122,6 +123,12 @@ class PhysicalConfirmation
                 return true;
             });
         } catch (\Throwable $error) {
+            // Rule failures are expected and retryable; anything else goes to the error tracker.
+            if ($error instanceof ValidationException) {
+                Log::warning('Integração nativa BC pendente.', ['registration_request_id' => $request->id, 'errors' => $error->errors()]);
+            } else {
+                report($error);
+            }
             DB::transaction(function () use ($request, $actor, $error) {
                 $request = $this->locked($request, $actor);
                 if (!$request->intermediate_registration_id && !$request->status->terminal()) {
@@ -140,7 +147,7 @@ class PhysicalConfirmation
     private function nativeRegistration(RegistrationRequest $request): LegacyRegistration
     {
         if (!$request->intermediate_registration_id || $request->integration_status !== 'INTEGRATED') {
-            $this->fail('Integração pendente. Confira o cadastro e reprocessse a aprovação digital antes de confirmar.');
+            $this->fail('Integração pendente. Confira o cadastro e reprocesse a aprovação digital antes de confirmar.');
         }
         $registration = LegacyRegistration::query()->lockForUpdate()->findOrFail($request->intermediate_registration_id);
         if ($registration->ref_cod_aluno !== $request->student_id || $registration->ref_ref_cod_escola !== $request->school_id

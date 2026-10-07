@@ -184,7 +184,7 @@ class BcRegistrationRequestController extends Controller
 
         return back()->with('status', $data['action'] === 'approve'
             ? ($registrationRequest->fresh()->workflow_version === 2
-                ? ($registrationRequest->fresh()->integration_status === 'INTEGRATED' ? 'Aprovação digital concluída. '.$registrationRequest->fresh()->documentationLabel().'.' : 'Aprovação digital mantida. Integração pendente: confira o cadastro e reprocessse a aprovação.')
+                ? ($registrationRequest->fresh()->integration_status === 'INTEGRATED' ? 'Aprovação digital concluída. '.$registrationRequest->fresh()->documentationLabel().'.' : 'Aprovação digital mantida. Integração pendente: confira o cadastro e reprocesse a aprovação.')
                 : 'Documentação aprovada. A matrícula aguarda efetivação explícita pela escola.')
             : 'Ação registrada com sucesso.');
     }

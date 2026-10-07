@@ -42,6 +42,10 @@ class AcceptPmdRegistrations extends AcceptPreRegistrations
                         && !($pmd->status === PreRegistration::STATUS_ACCEPTED && $request->status === RequestStatus::Registered)) {
                         throw ValidationException::withMessages(['pmd' => 'A pré-matrícula encerrada não pode liberar documentação.']);
                     }
+                    // A closed request would otherwise skip every step below and look like a successful deferment.
+                    if ($request->status->terminal() && $request->status !== RequestStatus::Registered) {
+                        throw ValidationException::withMessages(['pmd' => "A solicitação documental do protocolo {$pmd->protocol} está encerrada ({$request->status->value}) e não pode ser liberada novamente."]);
+                    }
                     // Deferment approves intake only, never native enrollment.
                     if ($pmd->status === PreRegistration::STATUS_WAITING && !$request->status->terminal()) {
                         $before = $pmd->status;
