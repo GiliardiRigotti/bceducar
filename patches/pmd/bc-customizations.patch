@@ -190,7 +190,7 @@ index 4df3d0d..9e7f759 100644
      </div>
    </div>
 diff --git a/resources/ts/components/form/AddressFields.vue b/resources/ts/components/form/AddressFields.vue
-index 18451da..ecc35d9 100644
+index 18451da..c08dc9b 100644
 --- a/resources/ts/components/form/AddressFields.vue
 +++ b/resources/ts/components/form/AddressFields.vue
 @@ -20,7 +20,6 @@
@@ -209,13 +209,20 @@ index 18451da..ecc35d9 100644
      />
      <x-field
        v-model="modelData.complement"
-@@ -54,12 +52,15 @@
+@@ -54,12 +52,25 @@
        :errors="checkError('neighborhood')"
        :disabled="!canEditAddress"
      />
 +    <x-field v-model="modelData.city" rules="required" container-class="form-group col-sm-9" label="Município" :name="`${name}.city`" type="TEXT" :errors="checkError('city')" />
 +    <x-field v-model="modelData.stateAbbreviation" rules="required" container-class="form-group col-sm-3" label="UF" :name="`${name}.stateAbbreviation`" type="TEXT" :errors="checkError('stateAbbreviation')" />
 +
++    <div class="col-12" v-if="message">
++      <p class="text-muted" role="status">{{ message }}</p>
++      <geo-map v-if="located" :lat="modelData.lat" :lng="modelData.lng" :zoom="16" style="height: 300px">
++        <template #default="{ map }"><geo-marker :map="map" :marker="homeMarker" /></template>
++      </geo-map>
++      <p v-if="located" class="text-muted mt-2">Na seleção de escola, você verá as unidades disponíveis junto ao seu endereço.</p>
++    </div>
    </div>
  </template>
  
@@ -223,11 +230,14 @@ index 18451da..ecc35d9 100644
 -import { Address, Nullable } from '@/types';
 -import { computed, onMounted, ref } from 'vue';
 +import { Address } from '@/types';
-+import { computed, ref, watch } from 'vue';
++import { computed, ref } from 'vue';
++import { useAddressLocation } from '@/composables/useAddressLocation';
++import GeoMap from '@/components/maps/GeoMap.vue';
++import GeoMarker from '@/components/maps/GeoMarker.vue';
  import XField from '@/components/x-form/XField.vue';
  import { useGeneralStore } from '@/store/general';
  import { useVModel } from '@vueuse/core';
-@@ -89,10 +90,7 @@ const store = useGeneralStore();
+@@ -89,10 +100,7 @@ const store = useGeneralStore();
  
  const cityPostalCode = ref();
  
@@ -238,7 +248,7 @@ index 18451da..ecc35d9 100644
  const modelData = useVModel(props, 'data');
  const modelFetchingAddressLatLng = useVModel(props, 'fetchingAddressLatLng');
  
-@@ -107,9 +105,7 @@ const isCityPostalCode = () => {
+@@ -107,9 +115,7 @@ const isCityPostalCode = () => {
    );
  };
  
@@ -249,7 +259,7 @@ index 18451da..ecc35d9 100644
  
  const updateAddress = (data: {
    logradouro: string;
-@@ -119,6 +115,8 @@ const updateAddress = (data: {
+@@ -119,6 +125,8 @@ const updateAddress = (data: {
    uf: string;
    ibge: string;
  }) => {
@@ -258,7 +268,7 @@ index 18451da..ecc35d9 100644
    modelData.value.address = data.logradouro;
    modelData.value.complement = data.complemento;
    modelData.value.neighborhood = data.bairro;
-@@ -140,77 +138,25 @@ const updateAddress = (data: {
+@@ -140,77 +148,20 @@ const updateAddress = (data: {
        'O CEP deve ser do município',
      ]);
    } else {
@@ -323,13 +333,8 @@ index 18451da..ecc35d9 100644
 -    modelFetchingAddressLatLng.value = false;
 -  }, 1000);
 -};
-+// An address is sufficient; geographic coordinates are optional metadata.
-+watch(() => [modelData.value.postalCode, modelData.value.address, modelData.value.number,
-+  modelData.value.neighborhood, modelData.value.city, modelData.value.stateAbbreviation], () => {
-+  modelData.value.lat = undefined;
-+  modelData.value.lng = undefined;
-+  modelData.value.manualChangeLocation = false;
-+});
++const { located, message } = useAddressLocation(modelData);
++const homeMarker = computed(() => ({id: 'residence', title: 'Seu endereço', color: 'green' as const, permanentLabel: 'Seu endereço', position: {lat: modelData.value.lat!, lng: modelData.value.lng!}}));
 +modelFetchingAddressLatLng.value = false;
  
  const checkError = (name: string) => {
@@ -1049,7 +1054,7 @@ index 66d4244..9d5c34b 100644
  
  const reactiveRoute = computed(() => route);
 diff --git a/resources/ts/modules/preregistration/components/PreRegistrationModal.vue b/resources/ts/modules/preregistration/components/PreRegistrationModal.vue
-index 675735c..0303379 100644
+index 675735c..e9e6834 100644
 --- a/resources/ts/modules/preregistration/components/PreRegistrationModal.vue
 +++ b/resources/ts/modules/preregistration/components/PreRegistrationModal.vue
 @@ -64,8 +64,8 @@
@@ -1089,16 +1094,30 @@ index 675735c..0303379 100644
      </template>
      <template #footer>
        <div
-@@ -675,7 +676,7 @@
+@@ -644,7 +645,7 @@
+             style="min-width: 160px; max-width: 200px; z-index: 9999"
+           >
+             <div
+-              v-if="store.features.allowPreregistrationDataUpdate"
++              v-if="store.features.allowPreregistrationDataUpdate && preregistration.status === 'WAITING'"
+               class="dropdown-menu-item"
+               @click="handleDropdownAction(edit)"
+             >
+@@ -671,11 +672,12 @@
+         </div>
+         <x-btn
+           v-if="showAcceptButton"
++          :disabled="preregistration.status !== 'WAITING'"
+           :loading="loadingAccept"
            color="accepted"
            outline
            class="ml-2 mr-2 mb-2 mb-lg-0"
 -          label="Deferir"
-+          label="Deferir pré-matrícula"
++          :label="preregistration.status === 'WAITING' ? 'Deferir pré-matrícula' : 'Pré-matrícula já deferida'"
            icon="pmd-accepted"
            no-wrap
            no-caps
-@@ -688,6 +689,7 @@
+@@ -688,6 +690,7 @@
  </template>
  
  <script setup lang="ts">
@@ -1106,6 +1125,32 @@ index 675735c..0303379 100644
  import { ErrorResponse, Option } from '@/types';
  import {
    Fields,
+@@ -921,14 +924,15 @@ const preregistrationEmpty = computed(
+ const showAcceptButton = computed(() => {
+   return (
+     (step.value === 'SHOW' || step.value === 'ACCEPT') &&
+-    preregistration.value.status !== 'ACCEPTED'
++    ['WAITING', 'SUMMONED', 'IN_CONFIRMATION', 'ACCEPTED'].includes(preregistration.value.status)
+   );
+ });
+ 
+ const showReturnToWaitButton = computed(() => {
+   return (
+     (isAdmin.value || isCoordinator.value || isSecretary.value) &&
+-    preregistration.value.status !== 'WAITING' &&
++    preregistration.value.status === 'REJECTED' &&
++    !preregistration.value.documentarySummary &&
+     step.value === 'SHOW'
+   );
+ });
+@@ -1005,6 +1009,7 @@ const updateExternalSystem = () => {
+ };
+ 
+ const accept = () => {
++  if (preregistration.value.status !== 'WAITING') return;
+   showError.value = false;
+   if (step.value === 'SHOW' && hasDataToUpdateInExternalSystem.value) {
+     step.value = 'SYNC';
 diff --git a/resources/ts/modules/preregistration/components/Review.vue b/resources/ts/modules/preregistration/components/Review.vue
 index fe3ce48..5fee9a8 100644
 --- a/resources/ts/modules/preregistration/components/Review.vue
@@ -1127,7 +1172,7 @@ index fe3ce48..5fee9a8 100644
            <div>
              {{ school(student.secondSchool) }} ({{
 diff --git a/resources/ts/modules/preregistration/components/StudentFields.vue b/resources/ts/modules/preregistration/components/StudentFields.vue
-index 784246b..1191c5f 100644
+index 784246b..7c0d52e 100644
 --- a/resources/ts/modules/preregistration/components/StudentFields.vue
 +++ b/resources/ts/modules/preregistration/components/StudentFields.vue
 @@ -204,11 +204,12 @@
@@ -1155,16 +1200,19 @@ index 784246b..1191c5f 100644
            :old-address-postition="oldAddressPosition"
            :is-using-second-address="isUsingSecondAddress"
            @undo-address-position="handleUndoAddressPosition(oldAddressPosition)"
-@@ -241,7 +240,7 @@
+@@ -241,7 +240,10 @@
            <template #map="{ adjustAddress, setNewPosition }">
              <div class="col-12">
                <x-card bordered>
 -                <google-maps
++                <p v-if="addressLocationMessage" class="text-muted" role="status">{{ addressLocationMessage }}</p>
++                <p class="text-muted">Pin verde: seu endereço · Pins azuis: escolas disponíveis.</p>
++                <p v-if="nearestSchool" class="alert alert-info">Escola disponível mais próxima: {{ nearestSchool }}</p>
 +                <geo-map
                    :config="store.map.config"
                    :lat="lat"
                    :lng="lng"
-@@ -250,9 +249,10 @@
+@@ -250,9 +252,11 @@
                    tabindex="-1"
                  >
                    <template #default="{ map }">
@@ -1173,11 +1221,12 @@ index 784246b..1191c5f 100644
                        :markers="markerClosestSchools"
 -                      :map="(map as google.maps.Map)"
 +                      :map="(map)"
++                      :extra-positions="homePositions"
 +                      fit-bounds
                        @click="selectFirstSchool"
                      >
                        <template #default="{ marker: markerSlot }">
-@@ -260,10 +260,10 @@
+@@ -260,10 +264,10 @@
                            <strong>{{ markerSlot.name }}</strong>
                          </div>
                        </template>
@@ -1192,7 +1241,7 @@ index 784246b..1191c5f 100644
                        :marker="marker"
                      >
                        <template #default>
-@@ -271,10 +271,10 @@
+@@ -271,10 +275,10 @@
                            <strong>Sua residência</strong>
                          </div>
                        </template>
@@ -1206,7 +1255,7 @@ index 784246b..1191c5f 100644
                        :marker="markerAdjustedAddress"
                        draggable
                        @new-position="setNewPosition"
-@@ -284,9 +284,9 @@
+@@ -284,9 +288,9 @@
                            <strong>Novo ponto de referência</strong>
                          </div>
                        </template>
@@ -1218,7 +1267,7 @@ index 784246b..1191c5f 100644
                </x-card>
              </div>
            </template>
-@@ -299,7 +299,7 @@
+@@ -299,7 +303,7 @@
          <x-btn
            class="w-100"
            color="primary"
@@ -1227,7 +1276,7 @@ index 784246b..1191c5f 100644
            no-caps
            no-wrap
            @click="setUseSecondSchool"
-@@ -307,7 +307,7 @@
+@@ -307,7 +311,7 @@
        </div>
        <template v-if="showWaitingListOption">
          <div class="col-12 mt-4">
@@ -1236,7 +1285,7 @@ index 784246b..1191c5f 100644
          </div>
          <x-field
            v-if="!isWaitingList"
-@@ -325,7 +325,7 @@
+@@ -325,7 +329,7 @@
            v-model="modelStudent.secondSchool"
            container-class="col-12"
            rules="required"
@@ -1245,7 +1294,7 @@ index 784246b..1191c5f 100644
            name="secondSchool"
            type="SELECT"
            :options="
-@@ -341,10 +341,7 @@
+@@ -341,10 +345,7 @@
          <select-address-position
            v-model:adjusted="adjustedWaitingListAddressPosition"
            v-model:old="oldWaitingListAddressPosition"
@@ -1257,7 +1306,7 @@ index 784246b..1191c5f 100644
            :old-address-postition="oldAddressPosition"
            :is-using-second-address="isUsingSecondAddress"
            @undo-address-position="
-@@ -367,7 +364,7 @@
+@@ -367,7 +368,7 @@
            <template #map="{ adjustAddress, setNewPosition }">
              <div class="col-12 mb-3">
                <x-card bordered>
@@ -1266,7 +1315,7 @@ index 784246b..1191c5f 100644
                    :config="store.map.config"
                    :lat="lat"
                    :lng="lng"
-@@ -376,7 +373,7 @@
+@@ -376,7 +377,7 @@
                    tabindex="-1"
                  >
                    <template #default="{ map }">
@@ -1275,17 +1324,18 @@ index 784246b..1191c5f 100644
                        :markers="
                          markerOptionalSchools(
                            getOptionalSchoolsFilter(
-@@ -388,7 +385,8 @@
+@@ -388,7 +389,9 @@
                            )
                          )
                        "
 -                      :map="(map as google.maps.Map)"
 +                      :map="(map)"
++                      :extra-positions="homePositions"
 +                      fit-bounds
                        @click="selectSecondSchool"
                      >
                        <template #default="{ marker: markerSlot }">
-@@ -396,9 +394,10 @@
+@@ -396,9 +399,10 @@
                            <strong>{{ markerSlot.label }}</strong>
                          </div>
                        </template>
@@ -1299,7 +1349,7 @@ index 784246b..1191c5f 100644
                        :marker="marker"
                      >
                        <template #default>
-@@ -406,10 +405,10 @@
+@@ -406,10 +410,10 @@
                            <strong>{{ marker.title }}</strong>
                          </div>
                        </template>
@@ -1313,7 +1363,7 @@ index 784246b..1191c5f 100644
                        :marker="markerAdjustedAddress"
                        draggable
                        @new-position="setNewPosition"
-@@ -419,9 +418,9 @@
+@@ -419,9 +423,9 @@
                            <strong>Novo ponto de referência</strong>
                          </div>
                        </template>
@@ -1325,7 +1375,7 @@ index 784246b..1191c5f 100644
                </x-card>
              </div>
            </template>
-@@ -438,13 +437,13 @@
+@@ -438,13 +442,13 @@
          </div>
  
          <template
@@ -1341,7 +1391,7 @@ index 784246b..1191c5f 100644
                </div>
                <x-field
                  v-model="modelStudent.grade"
-@@ -491,7 +490,7 @@
+@@ -491,7 +495,7 @@
                />
                <div class="col-12 mb-3">
                  <x-card bordered>
@@ -1350,7 +1400,7 @@ index 784246b..1191c5f 100644
                      :config="store.map.config"
                      :lat="lat"
                      :lng="lng"
-@@ -500,7 +499,7 @@
+@@ -500,7 +504,7 @@
                      tabindex="-1"
                    >
                      <template #default="{ map }">
@@ -1359,7 +1409,7 @@ index 784246b..1191c5f 100644
                          :markers="
                            markerOptionalSchools(
                              getOptionalSchoolsFilter(
-@@ -510,7 +509,7 @@
+@@ -510,7 +514,7 @@
                              )
                            )
                          "
@@ -1368,7 +1418,7 @@ index 784246b..1191c5f 100644
                          @click="waiting.school = $event?.id"
                        >
                          <template #default="{ marker: markerSlot }">
-@@ -518,9 +517,9 @@
+@@ -518,9 +522,9 @@
                              <strong>{{ markerSlot.label }}</strong>
                            </div>
                          </template>
@@ -1381,7 +1431,7 @@ index 784246b..1191c5f 100644
                          :marker="marker"
                        >
                          <template #default>
-@@ -528,9 +527,9 @@
+@@ -528,9 +532,9 @@
                              <strong>{{ marker.title }}</strong>
                            </div>
                          </template>
@@ -1393,7 +1443,7 @@ index 784246b..1191c5f 100644
                  </x-card>
                  <x-btn
                    class="ml-auto border-danger text-danger flex-row mt-3"
-@@ -547,11 +546,11 @@
+@@ -547,11 +551,11 @@
          <div class="col-12">
            <x-btn
              v-if="
@@ -1407,7 +1457,7 @@ index 784246b..1191c5f 100644
              no-caps
              no-wrap
              @click="addWaitingList"
-@@ -576,7 +575,7 @@
+@@ -576,7 +580,7 @@
  import {
    Address,
    AddressPosition,
@@ -1416,10 +1466,11 @@ index 784246b..1191c5f 100644
    Nullable,
    Option,
    Rules,
-@@ -597,12 +596,13 @@ import {
+@@ -597,12 +601,14 @@ import {
    ref,
    watch,
  } from 'vue';
++import { useAddressLocation } from '@/composables/useAddressLocation';
 +import { hasConfirmedCoordinates } from '../addressTransition';
  import { markerAddress, newLocationPosition } from '@/util';
  import { Filters } from '@/filters';
@@ -1433,7 +1484,7 @@ index 784246b..1191c5f 100644
  import NoSuggestedGradesMessage from '@/modules/preregistration/components/NoSuggestedGradesMessage.vue';
  import SelectAddressPosition from '@/components/elements/SelectAddressPosition.vue';
  import SuggestedGradesMessageComponent from '@/modules/preregistration/components/SuggestedGradesMessage.vue';
-@@ -610,7 +610,7 @@ import XBtn from '@/components/elements/buttons/XBtn.vue';
+@@ -610,7 +616,7 @@ import XBtn from '@/components/elements/buttons/XBtn.vue';
  import XCard from '@/components/elements/cards/XCard.vue';
  import XCardSection from '@/components/elements/cards/XCardSection.vue';
  import XField from '@/components/x-form/XField.vue';
@@ -1442,7 +1493,7 @@ index 784246b..1191c5f 100644
  import { isValidDate } from '@/datetime';
  import { useGeneralStore } from '@/store/general';
  import { useStudentProcessAndSuggestGrades } from '@/composables';
-@@ -638,9 +638,9 @@ export default defineComponent({
+@@ -638,9 +644,9 @@ export default defineComponent({
      XBtn,
      XCard,
      XCardSection,
@@ -1455,16 +1506,33 @@ index 784246b..1191c5f 100644
      SelectAddressPosition,
      SuggestedGradesMessageComponent,
      NoSuggestedGradesMessage,
-@@ -778,6 +778,8 @@ export default defineComponent({
+@@ -674,6 +680,8 @@ export default defineComponent({
+     const store = useGeneralStore();
+ 
+     const selectedAddress = ref<Address>(props.responsible.address);
++    const { message: addressLocationMessage } = useAddressLocation(selectedAddress);
++    const homePositions = computed(() => hasConfirmedCoordinates(selectedAddress.value) ? [{lat: selectedAddress.value.lat!, lng: selectedAddress.value.lng!}] : []);
+     const matchedSchool = ref<PreRegistrationStageProcessSchool>();
+     const matchedGrade = ref<Option>();
+ 
+@@ -778,12 +786,14 @@ export default defineComponent({
        return !doesntHaveSchoolsWithVacancies.value;
      });
  
 +    const hasAddressCoordinates = computed(() => hasConfirmedCoordinates(selectedAddress.value));
 +
      const lat = computed(() => {
-       return selectedAddress.value.lat || store.map.center.lat;
+-      return selectedAddress.value.lat || store.map.center.lat;
++      return hasAddressCoordinates.value ? selectedAddress.value.lat : store.map.center.lat;
      });
-@@ -854,6 +856,11 @@ export default defineComponent({
+ 
+     const lng = computed(() => {
+-      return selectedAddress.value.lng || store.map.center.lng;
++      return hasAddressCoordinates.value ? selectedAddress.value.lng : store.map.center.lng;
+     });
+ 
+     // Indica que a rematrícula só poderá ser feita na mesma escola do ano anterior.
+@@ -854,6 +864,11 @@ export default defineComponent({
        return allSchools
          .filter((s) => s.lat && s.lng)
          .filter((schoolOption) => {
@@ -1476,12 +1544,12 @@ index 784246b..1191c5f 100644
            const vacancies = process.value?.vacancies.filter(
              (v) => Number(v.school) === Number(schoolOption.id)
            );
-@@ -887,25 +894,21 @@ export default defineComponent({
+@@ -887,25 +902,29 @@ export default defineComponent({
      // Exibe apenas as escolas próximas ao endereço, quando o raio está configurado, caso não haja nenhuma escola
      // disponível, irá exibir todas as escolas que tenham turmas que possuam vagas na série e turno selecionados.
      // Utilizado para a listagem das escolas da escolha principal.
 +    const sortByDistance = (schools: School[]) => [...schools].sort((a, b) => {
-+      if (!hasAddressCoordinates.value) return [...schools];
++      if (!hasAddressCoordinates.value) return 0;
 +      const origin = {latitude: Number(selectedAddress.value.lat), longitude: Number(selectedAddress.value.lng)};
 +      return getDistance(origin, {latitude: a.lat, longitude: a.lng}) - getDistance(origin, {latitude: b.lat, longitude: b.lng});
 +    });
@@ -1497,12 +1565,19 @@ index 784246b..1191c5f 100644
 -          ? []
 -          : schoolsWithVacancy.value;
 -      }
--
--      return filtered;
 +      const available = schoolsWithVacancy.value as School[];
 +      return sortByDistance(renewalAtSameSchool.value
 +        ? available.filter(school => isMatchedSchool(school.id))
 +        : available);
++    });
+ 
+-      return filtered;
++    const nearestSchool = computed(() => {
++      if (!hasAddressCoordinates.value || !closestSchools.value.length) return '';
++      const school = closestSchools.value[0];
++      const distance = getDistance({latitude: selectedAddress.value.lat!, longitude: selectedAddress.value.lng!}, {latitude: school.lat, longitude: school.lng});
++      const label = distance >= 1000 ? (distance / 1000).toFixed(1).replace('.', ',') + ' km' : distance + ' m';
++      return (school.name || school.label) + ' · ' + label + ' em linha reta';
      });
  
 -    const markerClosestSchools = computed<GoogleMapsMarker[]>(
@@ -1514,7 +1589,7 @@ index 784246b..1191c5f 100644
      );
  
      const schoolsWithinRange = computed<School[]>(() => {
-@@ -966,7 +969,7 @@ export default defineComponent({
+@@ -966,7 +985,7 @@ export default defineComponent({
        return filteredSchools || [];
      });
  
@@ -1523,7 +1598,7 @@ index 784246b..1191c5f 100644
        () =>
          ({
            ...markerAddress(),
-@@ -974,20 +977,21 @@ export default defineComponent({
+@@ -974,20 +993,21 @@ export default defineComponent({
              lat: selectedAddress.value.lat,
              lng: selectedAddress.value.lng,
            },
@@ -1549,7 +1624,7 @@ index 784246b..1191c5f 100644
        () =>
          ({
            ...markerAddress(),
-@@ -995,7 +999,7 @@ export default defineComponent({
+@@ -995,7 +1015,7 @@ export default defineComponent({
              lat: selectedAddress.value.lat,
              lng: selectedAddress.value.lng,
            },
@@ -1558,7 +1633,7 @@ index 784246b..1191c5f 100644
      );
  
      const clearSchools = () => {
-@@ -1082,6 +1086,7 @@ export default defineComponent({
+@@ -1082,6 +1102,7 @@ export default defineComponent({
        }
  
        return (
@@ -1566,7 +1641,7 @@ index 784246b..1191c5f 100644
          (modelStage.value as PreRegistrationStage).radius <= 0 ||
          isPointWithinRadius(
            {
-@@ -1169,6 +1174,7 @@ export default defineComponent({
+@@ -1169,6 +1190,7 @@ export default defineComponent({
      };
  
      const addWaitingList = () => {
@@ -1574,7 +1649,17 @@ index 784246b..1191c5f 100644
        modelStudent.value?.waitingList.push({
          period: '',
          school: '',
-@@ -1275,6 +1281,7 @@ export default defineComponent({
+@@ -1251,6 +1273,9 @@ export default defineComponent({
+       filters,
+       store,
+       selectedAddress,
++      homePositions,
++      addressLocationMessage,
++      nearestSchool,
+       matchedSchool,
+       matchedGrade,
+       suggestedGrades,
+@@ -1275,6 +1300,7 @@ export default defineComponent({
        allSchools,
        closestSchools,
        markerClosestSchools,
@@ -1847,7 +1932,7 @@ index 197449b..f00b592 100644
  
  <style>
 diff --git a/resources/ts/types/types.ts b/resources/ts/types/types.ts
-index fb58d7b..e32324e 100644
+index fb58d7b..0563777 100644
 --- a/resources/ts/types/types.ts
 +++ b/resources/ts/types/types.ts
 @@ -227,15 +227,17 @@ export interface PaginatorInfo {
@@ -1856,7 +1941,7 @@ index fb58d7b..e32324e 100644
  
 -export interface GoogleMapsMarker {
 +export interface GeoMarkerData {
-+  color?: 'blue';
++  color?: 'blue' | 'green';
 +  permanentLabel?: string;
    id: string | number;
    title: string;
@@ -1872,7 +1957,7 @@ index fb58d7b..e32324e 100644
  }
  export interface ErrorResponse {
 diff --git a/resources/ts/util.ts b/resources/ts/util.ts
-index ca58d0c..1330033 100644
+index ca58d0c..9a6a143 100644
 --- a/resources/ts/util.ts
 +++ b/resources/ts/util.ts
 @@ -1,7 +1,7 @@
@@ -1893,7 +1978,7 @@ index ca58d0c..1330033 100644
    config: {
      icon: {
        path: string;
-@@ -93,7 +93,7 @@ const reportsTemplates = () => [
+@@ -93,9 +93,11 @@ const reportsTemplates = () => [
    { key: 4, label: 'Quantitativo' },
  ];
  
@@ -1901,8 +1986,12 @@ index ca58d0c..1330033 100644
 +const markerAddress = (): GeoMarkerData => ({
    id: 1,
    title: 'Seu endereço',
++  color: 'green',
++  permanentLabel: 'Seu endereço',
    position: null,
-@@ -116,8 +116,8 @@ const newAddress = (): Address => ({
+   config: {
+     icon: {
+@@ -116,8 +118,8 @@ const newAddress = (): Address => ({
    number: '',
    complement: '',
    neighborhood: '',
@@ -1913,7 +2002,7 @@ index ca58d0c..1330033 100644
    city: '',
    cityIbgeCode: 0,
    stateAbbreviation: '',
-@@ -323,17 +323,28 @@ const parseFieldsFromProcess = <T>(
+@@ -323,17 +325,28 @@ const parseFieldsFromProcess = <T>(
    };
  };
  
@@ -1950,7 +2039,7 @@ index ca58d0c..1330033 100644
  
  const parseStudentFieldsFromProcess = (process: ProcessTypes) =>
    parseFieldsFromProcess<PreRegistrationStudentField>(
-@@ -386,7 +397,7 @@ const preRegistrationStatusText = (status: string): string => {
+@@ -386,7 +399,7 @@ const preRegistrationStatusText = (status: string): string => {
      case 'ACCEPTED':
        return 'Deferido';
      case 'SUMMONED':

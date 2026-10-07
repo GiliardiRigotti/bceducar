@@ -4,7 +4,8 @@
 <h1>Pré-matrícula deferida</h1>
 <p>Sua pré-matrícula <strong>{{ $protocol }}</strong> está <strong>aguardando documentação</strong>. A matrícula ainda não foi efetivada.</p>
 @if($openedAt)<p>Documentação liberada em {{ $openedAt }}.</p>@endif
-<p>Acesse o acompanhamento para escolher envio online ou entrega presencial na escola <strong>até {{ $deadline }}</strong>. O prazo é igual nas duas formas de entrega.</p>
+<p>Convidamos você a iniciar a matrícula online ou escolher a entrega presencial na escola <strong>até {{ $deadline }}</strong>. O prazo é igual nas duas formas de entrega.</p>
+<p>Na opção online, o próximo passo é enviar os documentos da matrícula pelo acompanhamento. Na opção presencial, apresente os documentos na unidade escolar. A conclusão depende da análise e das confirmações da escola.</p>
 @else
 <p>@include('mail.guardian-registration-notice')</p>
 @endif

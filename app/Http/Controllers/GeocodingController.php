@@ -17,7 +17,7 @@ class GeocodingController extends Controller
             return response()->json(['result' => $result], $result ? 200 : 404)->header('Cache-Control', 'no-store');
         } catch (Throwable $error) {
             // Do not log residential addresses or provider response bodies.
-            return response()->json(['message' => 'Busca indisponível. Confirme sua localização no mapa.'], 503);
+            return response()->json(['message' => 'Busca indisponível. O endereço informado é suficiente para continuar.'], 503);
         }
     }
 }

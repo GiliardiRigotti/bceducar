@@ -228,3 +228,22 @@
 .bc-guardian .bc-data-form>label:has(textarea),.bc-guardian .bc-data-form>p { grid-column:1/-1; }
 .bc-guardian .bc-data-form>button { justify-self:start; }
 @media(max-width:680px){.bc-guardian .bc-data-form { grid-template-columns:1fr; }}
+
+/* Guardian profile: reuse the portal typography, cards, colors and controls. */
+.bc-profile-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+.bc-profile-row h2,.bc-profile-row h3 { margin:0; }
+.bc-muted { color:var(--bc-muted); }
+.bc-guardian .bc-dependent-organize { margin-top:12px; border-top:1px solid var(--bc-border); padding-top:14px; }
+.bc-guardian .bc-dependent-organize>summary { font-size:14px; }
+.bc-guardian .bc-checkbox-label { flex-direction:row; align-items:center; gap:8px; }
+.bc-guardian .bc-communication .bc-review-actions { margin-top:16px; align-items:center; }
+.bc-guardian .bc-review-actions form { margin:0; }
+.bc-guardian .bc-workflow-links { margin:20px 0 28px; }
+.bc-guardian .bc-data-form>.bc-review-actions { grid-column:1/-1; align-items:center; }
+.bc-guardian-header a[aria-current=page] { background:var(--bc-blue-soft); color:var(--bc-blue); }
+@media(max-width:680px) {
+ .bc-profile-row { align-items:flex-start; }
+ .bc-guardian .bc-communication .bc-review-actions { align-items:stretch; }
+ .bc-guardian .bc-communication .bc-review-actions>form { width:100%; }
+ .bc-guardian .bc-communication .bc-review-actions button { width:100%; }
+}

@@ -16,7 +16,7 @@ class GuardianRegistrationNotice extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: match ($this->kind) {
+        return new Envelope(subject: '['.$this->protocol.'] '.match ($this->kind) {
             'PREREGISTRATION_REGISTERED' => 'Pré-matrícula registrada: aguarde a análise',
             'MODE_SELECTED' => 'Forma de entrega documental escolhida',
             'DOCUMENT_RECEIVED' => 'Documento recebido para análise',
@@ -24,7 +24,7 @@ class GuardianRegistrationNotice extends Mailable
             'PHYSICAL_EXPIRED' => 'Prazo físico vencido: procure a escola',
             'PHYSICAL_REQUIRED' => 'Matrícula em confirmação: apresente os documentos físicos',
             'DOCUMENTATION_APPROVED' => 'Documentação aprovada: aguardando efetivação',
-            'DOCUMENTS_OPEN' => 'Pré-matrícula deferida: envie os documentos',
+            'DOCUMENTS_OPEN' => 'Pré-matrícula deferida: escolha matrícula online ou presencial',
             'CORRECTION' => 'Pendência documental da matrícula',
             'EXPIRED' => 'Prazo documental encerrado',
             'REGISTERED' => 'Matrícula efetivada',

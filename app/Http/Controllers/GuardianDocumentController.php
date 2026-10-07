@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\EnrollmentRequests\AttendanceMode;
 use App\EnrollmentRequests\DeclaredStudentData;
 use App\EnrollmentRequests\DocumentUploadPolicy;
+use App\EnrollmentRequests\GuardianCommunications;
+use App\EnrollmentRequests\GuardianDependents;
 use App\EnrollmentRequests\GuardianProfiles;
 use App\EnrollmentRequests\PmdGuardianDocuments;
 use App\EnrollmentRequests\RegistrationWorkflow;
@@ -147,7 +149,17 @@ class GuardianDocumentController extends Controller
         $requests = RegistrationRequest::query()->whereIn('pmd_preregistration_id', $applications->pluck('id'))
             ->get()->keyBy('pmd_preregistration_id');
 
-        return view('bc-registration.profile', compact('profile', 'applications', 'requests'));
+        $bindings = DB::table('bc_guardian_profile_applications')->where('profile_id', $profileId)->get()->keyBy('pmd_id');
+        foreach ($applications as $pmd) {
+            if (!$bindings->get($pmd->id)?->dependent_id) {
+                app(GuardianDependents::class)->ensure($profileId, $pmd->id);
+            }
+        }
+        $dependents = app(GuardianDependents::class)->all($profileId);
+        $bindings = DB::table('bc_guardian_profile_applications')->where('profile_id', $profileId)->get()->keyBy('pmd_id');
+        $unreadCount = app(GuardianCommunications::class)->unreadCount($profileId);
+
+        return view('bc-registration.profile', compact('profile', 'applications', 'requests', 'dependents', 'bindings', 'unreadCount'));
     }
 
     public function selectApplication(Request $request, int $pmd): RedirectResponse
@@ -197,11 +209,20 @@ class GuardianDocumentController extends Controller
     public function demo(Request $request): RedirectResponse
     {
         abort_unless(app()->environment('local'), 404);
-        $application = RegistrationRequest::query()->where('seed_source', BalnearioCamboriuDemoSeeder::SOURCE)
-            ->whereNotNull('pmd_preregistration_id')->where('document_deadline', '>=', now())
-            ->where('status', 'AGUARDANDO_DOCUMENTOS')->orderBy('id')->firstOrFail();
+        $examples = RegistrationRequest::query()->where('seed_source', BalnearioCamboriuDemoSeeder::SOURCE)
+            ->whereNotNull('pmd_preregistration_id')->whereHas('preregistration');
+        $application = (clone $examples)->where('document_deadline', '>=', now())
+            ->where('status', 'AGUARDANDO_DOCUMENTOS')->orderBy('id')->first()
+            ?? (clone $examples)->orderByDesc('document_deadline')->orderBy('id')->first();
+        if (!$application) {
+            return redirect()->route('bc-guardian.show')->withErrors([
+                'demo' => 'Não há inscrição fictícia disponível neste ambiente. Prepare a massa de demonstração local.',
+            ]);
+        }
+        $profileId = app(GuardianProfiles::class)->claim((int) $application->pmd_preregistration_id);
         $request->session()->regenerate();
-        $request->session()->forget('bc_guardian_profile_id');
+        $request->session()->forget('bc_guardian_challenge');
+        $request->session()->put('bc_guardian_profile_id', $profileId);
         $request->session()->put('bc_guardian_pmd_id', (int) $application->pmd_preregistration_id);
 
         return redirect()->route('bc-guardian.show');

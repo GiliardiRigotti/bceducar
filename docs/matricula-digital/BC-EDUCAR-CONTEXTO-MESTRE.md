@@ -2141,3 +2141,29 @@ Validação: 82 testes/927 assertions na regressão e 21 testes/180 assertions n
 O conjunto patches/pmd e scripts/apply-pmd-customizations.py preserva as adaptações do pacote antes ignoradas pelo Git principal; instalador integrado. Permanecem evoluções de perfil/dependentes/ficha completa, homologação visual e configuração institucional/produção registradas no levantamento. Esta correção não declara essas funcionalidades concluídas.
 
 Nesta preparação para commit, não foi confirmado novo reinício dos serviços locais após as últimas correções; a mudança da rotina Docker precisa de recriação do serviço bc-deadlines para carregar o novo comando. Não houve publicação em ambiente externo.
+
+
+## Perfil: dependentes persistentes e central de comunicações — 06/10/2026
+
+Implementada a próxima etapa do perfil do responsável, mantendo o CSS compartilhado da Matrícula Digital, cartões, tipografia, cores, botões e comportamento responsivo. Perfil, dependentes, comunicações e ficha usam o mesmo cabeçalho municipal. Não foi criada outra página de deferimento de pré-matrícula.
+
+- Dependentes declarados podem ser cadastrados e editados sem criar aluno, pessoa, pré-matrícula ou matrícula nativa. Dados de inscrições já enviadas não são sobrescritos pela edição do perfil.
+- Inscrições vinculadas por OTP recebem uma referência persistente ao dependente. A clonagem do snapshot ao corrigir a ficha preserva o vínculo. Reutilização automática ocorre somente entre inscrições já verificadas do mesmo perfil com o mesmo snapshot PMD; nome/CPF não autorizam vínculos.
+- O responsável pode organizar uma inscrição já confirmada em outro dependente de seu próprio perfil, com motivo e auditoria. Isso não altera a identidade declarada, a matrícula ou as permissões da inscrição. Chave estrangeira composta impede associar dependente de outro perfil.
+- Central de comunicações reúne avisos PMD e BC de inscrições confirmadas, com protocolo, orientação, prazo informado no aviso, filtros por dependente/inscrição/não lidas e paginação. Leitura é individual por perfil e idempotente; encaminhamento de e-mail não é apresentado como comprovação de entrega.
+- Criada a migration 2026_10_06_080000_create_guardian_dependents_and_notice_reads, aplicada em local e testing. Histórico de dependentes conserva alterações antes/depois e motivo; rollback recusa apagar dados existentes.
+- Validação: 45 testes/531 assertions aprovados (GuardianWorkspace 10, GuardianProfile 2, GuardianDocument 12, DeclaredStudentData 4, PhysicalConfirmation 9, RegistrationEndToEnd 3 e GuardianRegistrationNotice 5). Templates Blade compilados; estilos e controles reutilizados. Inspeção visual no navegador foi tentada duas vezes e permaneceu bloqueada pelo erro Windows apply deny-read ACLs.
+
+Permanecem: preenchimento/revisão de nova inscrição a partir do dependente dentro do PMD original; ficha completa e comparação/atualização autorizada campo a campo do cadastro nativo; edição/reverificação de contatos do responsável e perfil provisório no primeiro envio; composição completa da linha do tempo (a central atual reúne avisos); preparação institucional/produção e homologação visual. Esta etapa conclui cadastro/edição de dependentes e a central de avisos, sem declarar essas outras evoluções concluídas.
+
+### 06/10/2026 — Localização pelo endereço declarado
+
+Frontend preparado para geocodificação automática opcional, pin verde da residência, prévia no cadastro e mapa conjunto com escolas disponíveis. A busca aguarda 1,2 segundo de pausa, ignora respostas de endereços anteriores e nunca exige GPS/confirmação. A escola mais próxima é comparada pela distância em linha reta; disponibilidade e rematrícula continuam obedecendo ao processo original. Falhas permitem continuar.
+
+A configuração pública informa apenas se a geocodificação está habilitada; não publica URL privada. Neste ambiente, sem GEOCODING_URL, permanece desativada. Photon gratuito foi proposto, mas sua ativação aguarda autorização específica para enviar o endereço residencial a serviço externo; a revisão automática bloqueou essa integração. Não considerar o pin automático homologado em ambiente real antes dessa ativação e validação.
+
+### 06/10/2026 — Decisão de pré-matrícula bloqueada após deferimento
+
+O modal original mantém o botão de deferimento desabilitado após a aprovação, com indicação de decisão concluída. Escola, série e turno não podem ser editados após essa etapa; o backend também bloqueia edição direta e retorno à espera de inscrições já deferidas. Novas chamadas idênticas de deferimento mantêm a idempotência dos eventos e avisos.
+
+O aviso DOCUMENTS_OPEN explicita o deferimento e convida o responsável a escolher matrícula online ou entrega presencial. A modalidade online segue para envio documental; nenhuma escolha efetiva por si só a matrícula. Protocolo presente no corpo e no assunto de todos os avisos BC. Notificações executadas a cada cinco minutos; no teste local são capturadas pelo Mailpit, sem entrega externa.

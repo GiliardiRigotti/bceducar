@@ -14,3 +14,12 @@ it('fits all available school locations and recalculates when the options change
   expect(map.fitBounds).toHaveBeenLastCalledWith([[-26.99, -48.63]], {padding: [35, 45], maxZoom: 15});
   wrapper.unmount();
 });
+
+it('includes the residence when it is located after the school map opens', async () => {
+  const map = {fitBounds: vi.fn()} as any;
+  const wrapper = shallowMount(GeoMarkers, {props: {map, markers: [{id: 1, position: {lat: -26.99, lng: -48.63}}] as any, fitBounds: true}});
+  await wrapper.setProps({extraPositions: [{lat: -27.2, lng: -48.8}]});
+  await nextTick();
+  expect(map.fitBounds).toHaveBeenLastCalledWith([[-26.99, -48.63], [-27.2, -48.8]], {padding: [35, 45], maxZoom: 15});
+  wrapper.unmount();
+});

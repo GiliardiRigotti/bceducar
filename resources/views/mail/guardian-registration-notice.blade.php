@@ -18,7 +18,7 @@ A documentação da inscrição {{ $protocol }} foi aprovada. A matrícula ainda
 @elseif($kind === 'DOCUMENTS_OPEN')
 Sua pré-matrícula {{ $protocol }} foi deferida e está aguardando documentação. A matrícula ainda não foi efetivada.
 @if($openedAt)Documentação liberada em {{ $openedAt }}.@endif
-Envie os documentos online ou entregue-os presencialmente na escola até {{ $deadline }}. O prazo é o mesmo nas duas modalidades.
+Convidamos você a iniciar a matrícula online ou presencial. Escolhendo online, o próximo passo é enviar os documentos pelo acompanhamento. Para entrega presencial, apresente os documentos na escola até {{ $deadline }}. O prazo é o mesmo nas duas modalidades.
 Acesse o acompanhamento para escolher a forma de entrega dos documentos: {{ url('/matricula-digital') }}
 @elseif($kind === 'CORRECTION')
 Foi solicitada uma correção nos documentos da inscrição {{ $protocol }}.

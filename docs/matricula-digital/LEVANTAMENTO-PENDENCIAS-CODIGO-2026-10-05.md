@@ -2,6 +2,8 @@
 
 > Atualização em 06/10/2026: as cinco lacunas reproduzidas foram corrigidas, com regressões em tests/Feature/NativePhysicalProtectionTest.php. Monitoramento físico e prazo nos canais foram implementados. O pacote reproduzível está em patches/pmd. As demais evoluções e configurações continuam pendentes. O texto abaixo preserva as evidências do levantamento original.
 
+> Continuação em 06/10/2026: cadastro/edição de dependentes persistentes, organização de inscrições verificadas e central de avisos foram implementados. Reutilização na nova inscrição, ficha completa, contatos verificados e linha do tempo integral permanecem pendentes.
+
 ## Resultado
 
 O fluxo principal está implantado no Docker local, mas a implementação integral dos requisitos de perfil/ficha ainda não está concluída. A revisão encontrou lacunas nas integrações com caminhos nativos do i-Educar que devem ser corrigidas antes do uso operacional amplo da V2.

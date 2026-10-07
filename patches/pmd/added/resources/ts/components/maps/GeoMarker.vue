@@ -13,10 +13,10 @@ const mapClick = (event: L.LeafletMouseEvent) => { if (props.draggable) { intern
 onMounted(() => {
   const point = position();
   if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return;
-  const html = props.marker.color === 'blue'
-    ? '<svg width="28" height="32" viewBox="0 0 28 32" aria-hidden="true"><path fill="#1769d2" stroke="white" stroke-width="2" d="M14 1C7 1 2 6 2 13c0 8 12 18 12 18s12-10 12-18C26 6 21 1 14 1Z"/><circle cx="14" cy="12" r="4" fill="white"/></svg>'
+  const html = ['blue', 'green'].includes(props.marker.color || '')
+    ? '<svg width="28" height="32" viewBox="0 0 28 32" aria-hidden="true"><path fill="BC_PIN_COLOR" stroke="white" stroke-width="2" d="M14 1C7 1 2 6 2 13c0 8 12 18 12 18s12-10 12-18C26 6 21 1 14 1Z"/><circle cx="14" cy="12" r="4" fill="white"/></svg>'
     : '<span aria-hidden="true">&#128205;</span>';
-  const icon = L.divIcon({ className: 'bc-map-pin', html, iconSize: [28, 32], iconAnchor: [14, 32] });
+  const icon = L.divIcon({ className: 'bc-map-pin', html: html.replace('BC_PIN_COLOR', props.marker.color === 'green' ? '#19733d' : '#1769d2'), iconSize: [28, 32], iconAnchor: [14, 32] });
   internalMarker.value = L.marker([point.lat, point.lng], { icon, draggable: !!props.draggable, title: props.marker.title || '' }).addTo(props.map);
   if (content.value?.childNodes.length) { const popup = content.value.cloneNode(true) as HTMLElement; popup.style.display = 'block'; internalMarker.value.bindPopup(popup); }
   if (props.marker.permanentLabel) {

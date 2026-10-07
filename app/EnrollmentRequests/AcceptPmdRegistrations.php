@@ -26,6 +26,7 @@ class AcceptPmdRegistrations extends AcceptPreRegistrations
             $access = app(RequestAccess::class);
             $result = [];
             foreach ($args['ids'] as $id) {
+                DB::table('preregistrations')->where('id', $id)->lockForUpdate()->firstOrFail();
                 $pmd = PreRegistration::query()->findOrFail($id);
                 // Authorization uses the native school scope, including for upstream requests without a BC link.
                 $access->authorizeSchool($actor, $pmd->school_id);

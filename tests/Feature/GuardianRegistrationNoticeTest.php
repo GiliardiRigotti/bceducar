@@ -11,10 +11,12 @@ use App\Models\LegacyUser;
 use App\Models\RegistrationRequest;
 use Database\Seeders\BalnearioCamboriuDemoSeeder;
 use iEducar\Packages\PreMatricula\GraphQL\Mutations\AcceptPreRegistrations;
+use iEducar\Packages\PreMatricula\GraphQL\Mutations\UpdatePreRegistration;
 use iEducar\Packages\PreMatricula\Models\PreRegistration;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class GuardianRegistrationNoticeTest extends TestCase
@@ -58,6 +60,8 @@ class GuardianRegistrationNoticeTest extends TestCase
             $this->assertStringContainsString($request->document_deadline->format('d/m/Y H:i'), $html);
             $this->assertStringContainsString(url('/matricula-digital'), $html);
             $this->assertStringContainsString('entrega presencial', $html);
+            $this->assertStringContainsString('próximo passo', $html);
+            $this->assertStringContainsString($mail->protocol, $mail->envelope()->subject);
 
             return true;
         });
@@ -131,6 +135,38 @@ class GuardianRegistrationNoticeTest extends TestCase
         Mail::assertNothingOutgoing();
         $this->assertDatabaseHas('bc_guardian_notifications', [
             'kind' => 'REMINDER', 'attempts' => 5, 'last_error' => 'Lembrete desatualizado',
+        ]);
+    }
+
+    public function test_deferred_intake_cannot_change_school_grade_or_period_or_return_to_waiting(): void
+    {
+        $request = RegistrationRequest::query()->whereNotNull('pmd_preregistration_id')
+            ->where('status', 'AGUARDANDO_DOCUMENTOS')->firstOrFail();
+        $pmd = PreRegistration::query()->findOrFail($request->pmd_preregistration_id);
+        $original = $pmd->only(['school_id', 'grade_id', 'period_id', 'status']);
+        foreach (['school_id', 'grade_id', 'period_id', 'status'] as $field) {
+            $record = $pmd->fresh();
+            $record->$field = $field === 'status' ? PreRegistration::STATUS_WAITING : $record->$field + 999;
+            try {
+                $record->saveOrFail();
+                $this->fail('Deferimento deve permanecer bloqueado.');
+            } catch (ValidationException $error) {
+                $this->assertArrayHasKey('preregistration', $error->errors());
+            }
+            $this->assertSame($original, $pmd->fresh()->only(array_keys($original)));
+        }
+    }
+
+    public function test_edit_mutation_is_blocked_even_when_submitting_the_same_school_grade_and_period(): void
+    {
+        $request = RegistrationRequest::query()->whereNotNull('pmd_preregistration_id')
+            ->where('status', 'AGUARDANDO_DOCUMENTOS')->firstOrFail();
+        $pmd = PreRegistration::query()->findOrFail($request->pmd_preregistration_id);
+        $this->actingAs(LegacyUser::query()->findOrFail(BcDemoEntity::query()->where('key', 'user.admin.seduc')->value('legacy_id')));
+        $this->expectException(ValidationException::class);
+        app(UpdatePreRegistration::class)(null, [
+            'protocol' => $pmd->protocol, 'school' => $pmd->school_id,
+            'grade' => $pmd->grade_id, 'period' => $pmd->period_id,
         ]);
     }
 }

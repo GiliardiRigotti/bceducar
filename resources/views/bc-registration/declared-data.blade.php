@@ -1,6 +1,6 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Ficha cadastral · Matrícula Digital</title><link rel="stylesheet" href="{{ asset('vendor/bc-registration/workflow.css') }}?v=20261005-10"></head><body class="bc-guardian"><main class="bc-guardian-main">
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Ficha cadastral · Matrícula Digital</title><link rel="stylesheet" href="{{ asset('vendor/bc-registration/workflow.css') }}?v=20261006-1"></head><body class="bc-guardian">@include('bc-registration.guardian-header')<main class="bc-guardian-main">
 <a href="{{ route('bc-guardian.profile') }}">← Meu perfil</a>
-<section class="bc-hero"><h1>Dados declarados da pré-matrícula</h1><p>Protocolo {{ $pmd->protocol }}. A ficha oficial será consolidada na efetivação da matrícula.</p></section>
+<section class="bc-hero"><h1>Dados declarados da pré-matrícula</h1><p>Protocolo {{ $pmd->protocol }}. A escola confere os dados declarados antes da integração ao i-Educar. A matrícula depende da conclusão das etapas de documentação.</p></section>
 @if(session('status'))<p class="notice" role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<div class="notice" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
 @if($review?->status === 'CORRECTION')<p class="notice" role="alert"><strong>A escola solicitou correção:</strong> {{ $review->reason }}</p>@endif

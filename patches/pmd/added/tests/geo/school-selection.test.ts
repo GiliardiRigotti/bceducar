@@ -40,3 +40,13 @@ it('preserves renewal restricted to the previous school', () => {
   expect((wrapper.vm as any).closestSchools.map((school: any) => school.id)).toEqual(['1']);
   wrapper.unmount();
 });
+
+it('orders schools from the declared address without selecting one automatically', () => {
+  const wrapper = mountSelection({lat: -27.2, lng: -48.8});
+  expect((wrapper.vm as any).closestSchools.map((school: any) => school.id)).toEqual(['2', '1']);
+  expect((wrapper.vm as any).nearestSchool).toContain('Far');
+  expect((wrapper.vm as any).nearestSchool).toContain('linha reta');
+  expect((wrapper.vm as any).modelStudent.school).toBeNull();
+  expect((wrapper.vm as any).homePositions).toEqual([{lat: -27.2, lng: -48.8}]);
+  wrapper.unmount();
+});

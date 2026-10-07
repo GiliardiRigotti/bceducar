@@ -25,6 +25,7 @@ class GuardianProfiles
             $created = DB::table('bc_guardian_profile_applications')->insertOrIgnore([
                 'profile_id' => $profile->id, 'pmd_id' => $pmdId, 'verified_at' => now(),
             ]);
+            app(GuardianDependents::class)->ensure((int) $profile->id, $pmdId);
             $this->audit($profile->id, $created ? 'APPLICATION_LINK_VERIFIED' : 'AUTHENTICATED', $pmdId);
 
             return (int) $profile->id;

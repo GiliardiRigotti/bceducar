@@ -8,6 +8,7 @@ class MapConfig
     {
         return [
             'tileUrl' => config('maps.tile_url'),
+            'geocodingEnabled' => (bool) config('maps.geocoding_url'),
             'attribution' => config('maps.attribution'),
             'maxZoom' => max(1, min(22, (int) config('maps.max_zoom', 19))),
             'defaultLatitude' => (float) config('prematricula.map.lat', -26.99),
