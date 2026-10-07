@@ -1,0 +1,129 @@
+# Produção em VPS única. Uso:
+#   docker compose -f docker-compose.prod.yml up -d
+# Apenas o Caddy publica portas (80/443, com HTTPS automático). PostgreSQL e Redis
+# ficam restritos à rede interna do Docker. Veja DEPLOY-VPS.md.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+x-php: &php
+  build:
+    context: docker/php
+    dockerfile: Dockerfile.prod
+    args:
+      PHP_VERSION: "8.5"
+      COMPOSER_VERSION: "2.10"
+      HOST_UID: ${HOST_UID:-1001}
+      HOST_GID: ${HOST_GID:-1001}
+  image: php:8.5-ieducar-prod
+  working_dir: /var/www/ieducar
+  restart: unless-stopped
+  logging: *logging
+  volumes:
+    - ./:/var/www/ieducar
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_started
+  environment:
+    DB_HOST: postgres
+    DB_PORT: 5432
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    PGPASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env}
+
+services:
+
+  fpm:
+    <<: *php
+    container_name: ieducar-fpm
+
+  horizon:
+    <<: *php
+    container_name: ieducar-horizon
+    command: php /var/www/ieducar/artisan horizon
+
+  # Executa o agendador do Laravel (app/Console/Kernel.php), que já inclui as rotinas
+  # bc:* de prazos e avisos. Substitui o laço do serviço bc-deadlines do ambiente local.
+  scheduler:
+    <<: *php
+    container_name: ieducar-scheduler
+    command: php /var/www/ieducar/artisan schedule:work
+
+  nginx:
+    container_name: ieducar-nginx
+    image: nginx:1.30-alpine
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      - fpm
+    working_dir: /var/www/ieducar
+    volumes:
+      - ./:/var/www/ieducar:ro
+      - ./docker/nginx/conf.d/:/etc/nginx/conf.d/:ro
+      - ./docker/nginx/snippets:/etc/nginx/snippets/:ro
+
+  caddy:
+    container_name: ieducar-caddy
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      - nginx
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Defina APP_DOMAIN no .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Defina ACME_EMAIL no .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  postgres:
+    container_name: ieducar-postgres
+    image: postgres:18-alpine
+    restart: unless-stopped
+    logging: *logging
+    shm_size: 1g
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-ieducar}
+      POSTGRES_USER: ${DB_USERNAME:-ieducar}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env}
+      PGUSER: ${DB_USERNAME:-ieducar}
+    # Valores para VPS de 8 GB; para 16 GB use 4GB / 10GB.
+    command: >
+      postgres
+      -c shared_buffers=${PG_SHARED_BUFFERS:-2GB}
+      -c effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-5GB}
+      -c work_mem=${PG_WORK_MEM:-16MB}
+      -c maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-512MB}
+      -c max_connections=${PG_MAX_CONNECTIONS:-100}
+    volumes:
+      - postgres:/var/lib/postgresql/18/docker
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    container_name: ieducar-redis
+    image: redis:8-alpine
+    restart: unless-stopped
+    logging: *logging
+    command: redis-server --requirepass "${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}" --appendonly yes
+    volumes:
+      - redis:/data
+
+volumes:
+  postgres:
+  redis:
+  caddy-data:
+  caddy-config:

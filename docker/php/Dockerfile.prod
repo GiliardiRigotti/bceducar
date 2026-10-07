@@ -1,0 +1,47 @@
+ARG PHP_VERSION=8.5
+ARG COMPOSER_VERSION=2.10
+
+FROM composer:${COMPOSER_VERSION} AS composer
+FROM php:${PHP_VERSION}-fpm-alpine
+
+COPY --from=composer /usr/bin/composer /usr/local/bin/composer
+
+LABEL maintainer="Portabilis <contato@portabilis.com.br>"
+
+ENV COMPOSER_ALLOW_SUPERUSER 1
+ENV COMPOSER_PROCESS_TIMEOUT 900
+
+# Mesma base da imagem de desenvolvimento, sem Xdebug e com OPcache.
+RUN apk add --update \
+    libc-dev \
+    libpng-dev  \
+    libzip-dev  \
+    linux-headers \
+    postgresql18-client \
+    postgresql-dev \
+    unzip \
+    git \
+    openjdk8-jre \
+    fontconfig \
+    ttf-dejavu
+
+RUN apk add --no-cache --virtual .phpize_deps $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && docker-php-ext-install bcmath gd pcntl pdo pdo_pgsql pgsql zip ftp opcache \
+    && apk del .phpize_deps
+
+COPY production.ini /usr/local/etc/php/conf.d/zz-production.ini
+
+RUN ln -s /var/www/ieducar/artisan /usr/local/bin/artisan
+
+ARG HOST_UID=1001
+ARG HOST_GID=1001
+
+RUN addgroup -g ${HOST_GID} ieducar 2>/dev/null || addgroup ieducar && \
+    adduser -u ${HOST_UID} -G ieducar -s /bin/sh -D ieducar 2>/dev/null || \
+    adduser -G ieducar -s /bin/sh -D ieducar
+
+USER ieducar
+
+WORKDIR /var/www/ieducar

@@ -1,0 +1,15 @@
+{
+	email {$ACME_EMAIL}
+}
+
+# O limite de corpo da requisição fica no nginx (client_max_body_size) e no PHP.
+{$APP_DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy nginx:80
+}
